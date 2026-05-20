@@ -1,44 +1,77 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom'; // Captura o restaurante pela URL
 import { supabase } from '../supabaseClient';
 
-export default function AdminAdsView() {
-  const [anuncios, setAnuncios] = useState([]);
+export default function AdminView() {
+  const { slug } = useParams(); // Pega o slug da URL (ex: minha-hamburgueria)
+  const [estabelecimentoId, setEstabelecimentoId] = useState(null);
+  const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [idSendoEditado, setIdSendoEditado] = useState(null);
 
   const [form, setForm] = useState({
-    title: '',
-    description: '',
-    image: '',
-    active: true
+    nome: '',
+    preco: '',
+    categoria: 'Lanches',
+    descricao: '',
+    imagem: ''
   });
 
-  async function carregarAnuncios() {
+  const categorias = ['Lanches', 'Bebidas', 'Sobremesas'];
+
+  // 1. Carrega as informações do Estabelecimento primeiro
+  useEffect(() => {
+    async function carregarEstabelecimento() {
+      try {
+        const { data, error } = await supabase
+          .from('estabelecimentos')
+          .select('id')
+          .eq('slug', slug)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setEstabelecimentoId(data.id);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar estabelecimento no painel de produtos:', error.message);
+      }
+    }
+
+    if (slug) {
+      carregarEstabelecimento();
+    }
+  }, [slug]);
+
+  // 2. Carrega apenas os produtos deste estabelecimento específico
+  async function carregarProdutos() {
+    if (!estabelecimentoId) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('anuncios')
+        .from('produtos')
         .select('*')
+        .eq('estabelecimento_id', estabelecimentoId) // Filtro Multi-Tenant
         .order('id', { ascending: false });
 
       if (error) throw error;
-      setAnuncios(data || []);
+      setProdutos(data || []);
     } catch (error) {
-      alert('Erro ao carregar anúncios: ' + error.message);
+      alert('Erro ao carregar produtos: ' + error.message);
     } finally {
       setLoading(false);
     }
   }
 
+  // Dispara a busca de produtos sempre que o estabelecimentoId estiver pronto
   useEffect(() => {
-    carregarAnuncios();
-  }, []);
+    carregarProdutos();
+  }, [estabelecimentoId]);
 
   const handleChange = (e) => {
-    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setForm({ ...form, [e.target.name]: value });
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleUploadImagem = async (e) => {
@@ -49,7 +82,7 @@ export default function AdminAdsView() {
       setUploading(true);
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `banners-${Date.now()}.${fileExt}`;
+      const fileName = `produtos-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('imagens-produtos')
@@ -61,10 +94,10 @@ export default function AdminAdsView() {
         .from('imagens-produtos')
         .getPublicUrl(fileName);
 
-      setForm((prev) => ({ ...prev, image: data.publicUrl }));
-      alert('Banner enviado com sucesso!');
+      setForm((prev) => ({ ...prev, imagem: data.publicUrl }));
+      alert('Imagem do produto enviada com sucesso!');
     } catch (error) {
-      alert('Erro no upload: ' + error.message);
+      alert('Erro no upload da imagem: ' + error.message);
     } finally {
       setUploading(false);
     }
@@ -72,95 +105,129 @@ export default function AdminAdsView() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.title) return alert('O título do anúncio é obrigatório!');
+    if (!form.nome || !form.preco) return alert('Nome e Preço são obrigatórios!');
+    if (!estabelecimentoId) return alert('Erro: Estabelecimento não identificado.');
 
     try {
       const payload = {
-        title: form.title,
-        description: form.description,
-        image: form.image,
-        active: form.active
+        nome: form.nome,
+        preco: parseFloat(form.preco),
+        categoria: form.categoria,
+        descricao: form.descricao,
+        imagem: form.imagem,
+        estabelecimento_id: estabelecimentoId // Força o vínculo com a loja correta
       };
 
       if (modoEdicao) {
         const { error } = await supabase
-          .from('anuncios')
+          .from('produtos')
           .update(payload)
           .eq('id', idSendoEditado);
 
         if (error) throw error;
-        alert('Anúncio atualizado!');
+        alert('Produto atualizado!');
       } else {
         const { error } = await supabase
-          .from('anuncios')
+          .from('produtos')
           .insert([payload]);
 
         if (error) throw error;
-        alert('Anúncio criado!');
+        alert('Produto criado com sucesso!');
       }
 
       limparFormulario();
-      carregarAnuncios();
+      carregarProdutos();
     } catch (error) {
-      alert('Erro ao salvar: ' + error.message);
+      alert('Erro ao salvar produto: ' + error.message);
     }
   };
 
-  const iniciarEdicao = (anuncio) => {
+  const iniciarEdicao = (produto) => {
     setModoEdicao(true);
-    setIdSendoEditado(anuncio.id);
+    setIdSendoEditado(produto.id);
     setForm({
-      title: anuncio.title || '',
-      description: anuncio.description || '',
-      image: anuncio.image || '',
-      active: anuncio.active ?? true
+      nome: produto.nome || '',
+      preco: produto.preco || '',
+      categoria: produto.categoria || 'Lanches',
+      descricao: produto.descricao || '',
+      imagem: produto.imagem || ''
     });
   };
 
   const handleDeletar = async (id) => {
-    if (!window.confirm('Excluir este anúncio permanentemente?')) return;
+    if (!window.confirm('Excluir este produto permanentemente?')) return;
     try {
-      const { error } = await supabase.from('anuncios').delete().eq('id', id);
+      const { error } = await supabase.from('produtos').delete().eq('id', id);
       if (error) throw error;
-      alert('Anúncio removido!');
-      carregarAnuncios();
+      alert('Produto removido!');
+      carregarProdutos();
     } catch (error) {
-      alert('Erro ao deletar: ' + error.message);
+      alert('Erro ao deletar produto: ' + error.message);
     }
   };
 
   const limparFormulario = () => {
     setModoEdicao(false);
     setIdSendoEditado(null);
-    setForm({ title: '', description: '', image: '', active: true });
+    setForm({ nome: '', preco: '', categoria: 'Lanches', descricao: '', imagem: '' });
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 pb-24">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Gerenciar Banners / Anúncios</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Gerenciar Cardápio / Produtos</h1>
 
+        {/* Formulário de Cadastro/Edição */}
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8 border border-gray-200">
           <h2 className="text-xl font-bold text-gray-800 mb-4">
-            {modoEdicao ? 'Editar Banner' : 'Criar Novo Banner Promocional'}
+            {modoEdicao ? 'Editar Produto' : 'Adicionar Novo Item ao Cardápio'}
           </h2>
           
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Título do Anúncio *</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto *</label>
                 <input
                   type="text"
-                  name="title"
-                  value={form.title}
+                  name="nome"
+                  value={form.nome}
                   onChange={handleChange}
                   className="w-full border border-gray-300 rounded-xl px-4 py-2"
-                  placeholder="Ex: Sabadão do Bacon: 20% OFF"
+                  placeholder="Ex: Burger Triplo Bacon"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Upload do Banner (PNG/JPG)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="preco"
+                  value={form.preco}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                <select
+                  name="categoria"
+                  value={form.categoria}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 bg-white"
+                >
+                  {categorias.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagem do Produto (PNG/JPG)</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -172,34 +239,20 @@ export default function AdminAdsView() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Texto de Subtítulo / Descrição</label>
-              <input
-                type="text"
-                name="description"
-                value={form.description}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descrição dos Ingredientes</label>
+              <textarea
+                name="descricao"
+                value={form.descricao}
                 onChange={handleChange}
+                rows="3"
                 className="w-full border border-gray-300 rounded-xl px-4 py-2"
-                placeholder="Ex: Válido na compra de qualquer combo até as 22h."
+                placeholder="Ex: Pão australiano, 3 blends de 150g, muito bacon e queijo cheddar maçaricado."
               />
             </div>
 
-            <div className="flex items-center gap-2 py-2">
-              <input
-                type="checkbox"
-                name="active"
-                id="active"
-                checked={form.active}
-                onChange={handleChange}
-                className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
-              />
-              <label htmlFor="active" className="text-sm font-medium text-gray-700 select-none">
-                Ativar banner imediatamente no carrossel do cliente
-              </label>
-            </div>
-
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <button type="submit" className="bg-amber-500 text-white font-medium px-6 py-2 rounded-xl hover:bg-amber-600">
-                {modoEdicao ? 'Salvar Alterações' : 'Publicar Banner'}
+                {modoEdicao ? 'Salvar Alterações' : 'Cadastrar Produto'}
               </button>
               {modoEdicao && (
                 <button type="button" onClick={limparFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-xl">
@@ -210,34 +263,43 @@ export default function AdminAdsView() {
           </form>
         </div>
 
-        {/* Lista de Banners */}
+        {/* Tabela / Lista de Itens Cadastrados */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">Banners Ativos e Inativos</h2>
+            <h2 className="text-xl font-bold text-gray-800">Itens no Cardápio Atual</h2>
           </div>
 
           {loading ? (
-            <p className="p-6 text-center text-gray-500">Buscando banners...</p>
+            <p className="p-6 text-center text-gray-500">Buscando itens do cardápio...</p>
           ) : (
             <div className="divide-y divide-gray-200">
-              {anuncios.map((anuncio) => (
-                <div key={anuncio.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
-                  <div className="flex items-center gap-4">
-                    <img src={anuncio.image || 'https://placehold.co/120x80'} className="w-16 h-12 object-cover rounded-lg border" alt="" />
-                    <div>
-                      <h4 className="font-bold text-gray-900">{anuncio.title}</h4>
-                      <p className="text-xs text-gray-500">{anuncio.description || 'Sem descrição'}</p>
-                      <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded-full ${anuncio.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                        {anuncio.active ? 'Visível' : 'Oculto'}
-                      </span>
+              {produtos.length === 0 ? (
+                <p className="p-6 text-center text-gray-400">Nenhum produto cadastrado para este estabelecimento ainda.</p>
+              ) : (
+                produtos.map((produto) => (
+                  <div key={produto.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                    <div className="flex items-center gap-4">
+                      <img src={produto.imagem || 'https://placehold.co/100x100?text=Burger'} className="w-14 h-14 object-cover rounded-xl border" alt="" />
+                      <div>
+                        <h4 className="font-bold text-gray-900">{produto.nome}</h4>
+                        <p className="text-xs text-gray-500 max-w-md truncate">{produto.descricao || 'Sem descrição'}</p>
+                        <div className="flex gap-2 mt-1">
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                            {produto.categoria}
+                          </span>
+                          <span className="text-xs font-bold text-gray-700">
+                            R$ {parseFloat(produto.preco).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => iniciarEdicao(produto)} className="text-blue-600 text-sm font-semibold hover:underline">Editar</button>
+                      <button onClick={() => handleDeletar(produto.id)} className="text-red-600 text-sm font-semibold hover:underline">Remover</button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => iniciarEdicao(anuncio)} className="text-blue-600 text-sm font-semibold hover:underline">Editar</button>
-                    <button onClick={() => handleDeletar(anuncio.id)} className="text-red-600 text-sm font-semibold hover:underline">Remover</button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
         </div>

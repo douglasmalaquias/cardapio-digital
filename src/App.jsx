@@ -12,8 +12,8 @@ export default function App() {
         <Route path="/:slug" element={<CustomerView />} />
 
         {/* Rotas da administração */}
-        <Route path="/admin/produtos" element={<AdminView />} />
-        <Route path="/admin/anuncios" element={<AdminAdsView />} />
+<Route path="/admin/:slug/produtos" element={<AdminView />} />
+<Route path="/admin/:slug/anuncios" element={<AdminAdsView />} />
 
         {/* Se alguém entrar na raiz sem nada, redireciona temporariamente para o nosso teste */}
         <Route path="*" element={<Navigate to="/minha-hamburgueria" replace />} />
