@@ -4,14 +4,14 @@ import { supabase } from '../supabaseClient';
 
 export default function AdminView() {
   const { slug } = useParams();
-  const [estabelecimentoId, setEstablishmentId] = useState(null);
+  const [estabelecimentoId, setEstabelecimentoId] = useState(null);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [idSendoEditado, setIdSendoEditado] = useState(null);
 
-  // Estados novos para gerenciar a Janela de Adicionais
+  // Estados para gerenciar a Janela de Adicionais
   const [produtoParaComplementos, setProdutoParaComplementos] = useState(null);
   const [complementos, setComplementos] = useState([]);
   const [formComplemento, setFormComplemento] = useState({ nome: '', preco: '' });
@@ -22,12 +22,12 @@ export default function AdminView() {
     categoria: 'Lanches',
     descricao: '',
     imagem: '',
-    ativo: true // Campo de controle de estoque nativo
+    ativo: true
   });
 
   const categorias = ['Lanches', 'Bebidas', 'Sobremesas'];
 
-  // 1. Carrega as informações do Estabelecimento primeiro
+  // 1. Carrega as informações do Estabelecimento
   useEffect(() => {
     async function carregarEstabelecimento() {
       try {
@@ -38,7 +38,7 @@ export default function AdminView() {
           .single();
 
         if (error) throw error;
-        if (data) setEstablishmentId(data.id);
+        if (data) setEstabelecimentoId(data.id);
       } catch (error) {
         console.error('Erro ao buscar estabelecimento no painel de produtos:', error.message);
       }
@@ -142,7 +142,7 @@ export default function AdminView() {
           .eq('id', idSendoEditado);
 
         if (error) throw error;
-        alert('Produto atualizado!');
+        alert('Produto updated!');
       } else {
         const { error } = await supabase
           .from('produtos')
@@ -190,7 +190,6 @@ export default function AdminView() {
     setForm({ nome: '', preco: '', categoria: 'Lanches', descricao: '', imagem: '', ativo: true });
   };
 
-  // Funções para manipulação direta de Adicionais/Complementos
   const handleCriarComplemento = async (e) => {
     e.preventDefault();
     if (!formComplemento.nome || !formComplemento.preco) return alert('Insira o nome e o preço do adicional!');
@@ -296,11 +295,10 @@ export default function AdminView() {
                 onChange={handleChange}
                 rows="3"
                 className="w-full border border-gray-300 rounded-xl px-4 py-2"
-                placeholder="Ex: Pão australiano, 3 blends de 150g, muito bacon e queijo cheddar maçaricado."
+                placeholder="Ex: Pão australiano, 3 blends de 150g..."
               />
             </div>
 
-            {/* GATILHO ON/OFF DE ESTOQUE/DISPONIBILIDADE */}
             <div className="flex items-center gap-2 py-2">
               <input
                 type="checkbox"
@@ -317,4 +315,135 @@ export default function AdminView() {
 
             <div className="flex gap-3 pt-2">
               <button type="submit" className="bg-amber-500 text-white font-medium px-6 py-2 rounded-xl hover:bg-amber-600">
-                {modoEdicao ? '
+                {modoEdicao ? 'Salvar Alterações' : 'Cadastrar Produto'}
+              </button>
+              {modoEdicao && (
+                <button type="button" onClick={limparFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-xl">
+                  Cancelar
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* Lista de Itens Cadastrados */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-800">Itens no Cardápio Atual</h2>
+          </div>
+
+          {loading ? (
+            <p className="p-6 text-center text-gray-500">Buscando itens do cardápio...</p>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {produtos.length === 0 ? (
+                <p className="p-6 text-center text-gray-400">Nenhum produto cadastrado ainda.</p>
+              ) : (
+                produtos.map((produto) => (
+                  <div key={produto.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                    <div className="flex items-center gap-4">
+                      <img src={produto.imagem || 'https://placehold.co/100x100?text=Burger'} className="w-14 h-14 object-cover rounded-xl border" alt="" />
+                      <div>
+                        <h4 className="font-bold text-gray-900">{produto.nome}</h4>
+                        <p className="text-xs text-gray-500 max-w-md truncate">{produto.descricao || 'Sem descrição'}</p>
+                        <div className="flex gap-2 mt-1 items-center">
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                            {produto.categoria}
+                          </span>
+                          <span className="text-xs font-bold text-gray-700">
+                            R$ {parseFloat(produto.preco).toFixed(2)}
+                          </span>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${produto.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {produto.ativo ? 'Disponível' : 'Indisponível'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 items-center">
+                      <button 
+                        onClick={() => {
+                          setProdutoParaComplementos(produto);
+                          carregarComplementos(produto.id);
+                        }} 
+                        className="text-amber-600 text-sm font-semibold hover:underline"
+                      >
+                        + Adicionais
+                      </button>
+                      <button onClick={() => iniciarEdicao(produto)} className="text-blue-600 text-sm font-semibold hover:underline">Editar</button>
+                      <button onClick={() => handleDeletar(produto.id)} className="text-red-600 text-sm font-semibold hover:underline">Remover</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* MODAL DE GERENCIAMENTO DE COMPLEMENTOS */}
+      {produtoParaComplementos && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center pb-4 border-b">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Adicionais e Opcionais</h3>
+                <p className="text-xs text-gray-500">Item: {produtoParaComplementos.nome}</p>
+              </div>
+              <button onClick={() => setProdutoParaComplementos(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1">
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleCriarComplemento} className="grid grid-cols-3 gap-2 py-4 border-b bg-gray-50 p-3 mt-3 rounded-xl">
+              <div className="col-span-2">
+                <input 
+                  type="text" 
+                  placeholder="Ex: Queijo Extra"
+                  value={formComplemento.nome}
+                  onChange={(e) => setFormComplemento({ ...formComplemento, nome: e.target.value })}
+                  className="w-full border text-sm rounded-lg px-3 py-1.5 bg-white"
+                />
+              </div>
+              <div>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  placeholder="Preço R$"
+                  value={formComplemento.preco}
+                  onChange={(e) => setFormComplemento({ ...formComplemento, preco: e.target.value })}
+                  className="w-full border text-sm rounded-lg px-3 py-1.5 bg-white"
+                />
+              </div>
+              <div className="col-span-3 pt-1">
+                <button type="submit" className="w-full bg-gray-900 text-white font-medium text-xs py-2 rounded-lg hover:bg-gray-800">
+                  Vincular Adicional
+                </button>
+              </div>
+            </form>
+
+            <div className="overflow-y-auto flex-1 mt-4 space-y-2 pr-1">
+              {complementos.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">Nenhum opcional cadastrado.</p>
+              ) : (
+                complementos.map((comp) => (
+                  <div key={comp.id} className="flex justify-between items-center bg-white border p-3 rounded-xl shadow-2xs">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{comp.nome}</p>
+                      <p className="text-xs text-amber-600 font-semibold">+ R$ {parseFloat(comp.preco).toFixed(2)}</p>
+                    </div>
+                    <button 
+                      onClick={() => handleDeletarComplemento(comp.id)}
+                      className="text-red-500 hover:text-red-700 text-xs font-medium border border-red-100 px-2 py-1 rounded-lg"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
