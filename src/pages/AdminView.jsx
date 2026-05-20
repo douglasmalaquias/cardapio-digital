@@ -40,7 +40,7 @@ export default function AdminView() {
           .single();
 
         if (error) throw error;
-        if (data) setEstablishelecimentoId(data.id);
+        if (data) setEstabelecimentoId(data.id);
       } catch (error) {
         console.error('Erro ao buscar estabelecimento:', error.message);
       }
