@@ -1,10 +1,10 @@
 import React from 'react';
 
-export default function ProductCard({ produto, onVerDetalhes }) {
+export default function ProductCard({ produto, onSelect }) { // <-- Nome ajustado aqui
   const nome = produto.nome || produto.title || 'Produto sem nome';
   const preco = produto.preco || 0;
   const descricao = produto.description || produto.descricao || '';
-  const imagem = produto.image || produto.imagem_url || null;
+  const imagem = produto.image || produto.imagem_url || produto.imagem || null;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
@@ -38,7 +38,7 @@ export default function ProductCard({ produto, onVerDetalhes }) {
 
       <div className="px-5 pb-5">
         <button
-          onClick={() => onVerDetalhes(produto)}
+          onClick={() => onSelect(produto)} // <-- Disparo ajustado aqui
           className="w-full bg-amber-500 text-white font-medium py-2 rounded-xl hover:bg-amber-600 transition-colors duration-200"
         >
           Ver Detalhes

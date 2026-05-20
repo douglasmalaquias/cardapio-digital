@@ -6,26 +6,28 @@ export default function AdminView() {
   const { slug } = useParams();
   const [estabelecimentoId, setEstabelecimentoId] = useState(null);
   const [produtos, setProdutos] = useState([]);
+  const [categorias, setCategorias] = useState([]); // Categorias vindas do banco
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [idSendoEditado, setIdSendoEditado] = useState(null);
 
-  // Estados para gerenciar a Janela de Adicionais
+  // Estados para Gerenciamento de Opcionais
   const [produtoParaComplementos, setProdutoParaComplementos] = useState(null);
   const [complementos, setComplementos] = useState([]);
   const [formComplemento, setFormComplemento] = useState({ nome: '', preco: '' });
 
+  // Estado para Criar Nova Categoria
+  const [novaCategoria, setNovaCategoria] = useState('');
+
   const [form, setForm] = useState({
     nome: '',
     preco: '',
-    categoria: 'Lanches',
+    categoria: '',
     descricao: '',
     imagem: '',
     ativo: true
   });
-
-  const categorias = ['Lanches', 'Bebidas', 'Sobremesas'];
 
   // 1. Carrega as informações do Estabelecimento
   useEffect(() => {
@@ -38,17 +40,43 @@ export default function AdminView() {
           .single();
 
         if (error) throw error;
-        if (data) setEstabelecimentoId(data.id);
+        if (data) setEstablishelecimentoId(data.id);
       } catch (error) {
-        console.error('Erro ao buscar estabelecimento no painel de produtos:', error.message);
+        console.error('Erro ao buscar estabelecimento:', error.message);
       }
     }
     if (slug) carregarEstabelecimento();
   }, [slug]);
 
-  // 2. Carrega os produtos deste estabelecimento específico
+  // 2. Carrega as Categorias e Produtos assim que tiver o ID do estabelecimento
+  useEffect(() => {
+    if (estabelecimentoId) {
+      carregarCategorias();
+      carregarProdutos();
+    }
+  }, [estabelecimentoId]);
+
+  async function carregarCategorias() {
+    try {
+      const { data, error } = await supabase
+        .from('categorias')
+        .select('*')
+        .eq('estabelecimento_id', estabelecimentoId)
+        .order('nome', { ascending: true });
+
+      if (error) throw error;
+      setCategorias(data || []);
+      
+      // Define a primeira categoria como padrão no formulário se não houver nenhuma selecionada
+      if (data && data.length > 0 && !form.categoria) {
+        setForm(prev => ({ ...prev, categoria: data[0].nome }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error.message);
+    }
+  }
+
   async function carregarProdutos() {
-    if (!estabelecimentoId) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -66,11 +94,6 @@ export default function AdminView() {
     }
   }
 
-  useEffect(() => {
-    carregarProdutos();
-  }, [estabelecimentoId]);
-
-  // Carrega os complementos do produto selecionado
   async function carregarComplementos(produtoId) {
     try {
       const { data, error } = await supabase
@@ -89,6 +112,37 @@ export default function AdminView() {
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setForm({ ...form, [e.target.name]: value });
+  };
+
+  // Criar Nova Categoria Dinâmica
+  const handleCriarCategoria = async (e) => {
+    e.preventDefault();
+    if (!novaCategoria.trim()) return alert('Digite o nome da categoria!');
+
+    try {
+      const { error } = await supabase
+        .from('categorias')
+        .insert([{ estabelecimento_id: estabelecimentoId, nome: novaCategoria.trim() }]);
+
+      if (error) throw error;
+      alert('Categoria adicionada!');
+      setNovaCategoria('');
+      carregarCategorias();
+    } catch (error) {
+      alert('Erro ao criar categoria: ' + error.message);
+    }
+  };
+
+  // Deletar Categoria
+  const handleDeletarCategoria = async (id, nomeCat) => {
+    if (!window.confirm(`Deseja excluir a categoria "${nomeCat}"? Produtos vinculados a ela precisarão ser revisados.`)) return;
+    try {
+      const { error } = await supabase.from('categorias').delete().eq('id', id);
+      if (error) throw error;
+      carregarCategorias();
+    } catch (error) {
+      alert('Erro ao deletar categoria: ' + error.message);
+    }
   };
 
   const handleUploadImagem = async (e) => {
@@ -111,9 +165,9 @@ export default function AdminView() {
         .getPublicUrl(fileName);
 
       setForm((prev) => ({ ...prev, imagem: data.publicUrl }));
-      alert('Imagem do produto enviada com sucesso!');
+      alert('Imagem enviada!');
     } catch (error) {
-      alert('Erro no upload da imagem: ' + error.message);
+      alert('Erro no upload: ' + error.message);
     } finally {
       setUploading(false);
     }
@@ -122,15 +176,15 @@ export default function AdminView() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.nome || !form.preco) return alert('Nome e Preço são obrigatórios!');
-    if (!estabelecimentoId) return alert('Erro: Estabelecimento não identificado.');
+    if (!form.categoria) return alert('Selecione ou crie uma categoria antes!');
 
     try {
       const payload = {
         nome: form.nome,
         preco: parseFloat(form.preco),
         categoria: form.categoria,
-        descricao: form.descricao,
-        imagem: form.imagem,
+        descricao: form.descricao, 
+        imagem_url: form.imagem,  
         ativo: form.ativo,
         estabelecimento_id: estabelecimentoId
       };
@@ -142,7 +196,7 @@ export default function AdminView() {
           .eq('id', idSendoEditado);
 
         if (error) throw error;
-        alert('Produto updated!');
+        alert('Produto atualizado!');
       } else {
         const { error } = await supabase
           .from('produtos')
@@ -165,9 +219,9 @@ export default function AdminView() {
     setForm({
       nome: produto.nome || '',
       preco: produto.preco || '',
-      categoria: produto.categoria || 'Lanches',
-      descricao: produto.descricao || '',
-      imagem: produto.imagem || '',
+      categoria: produto.categoria || (categorias[0]?.nome || ''),
+      descricao: produto.descricao || '', 
+      imagem: produto.imagem_url || '', 
       ativo: produto.ativo ?? true
     });
   };
@@ -187,7 +241,14 @@ export default function AdminView() {
   const limparFormulario = () => {
     setModoEdicao(false);
     setIdSendoEditado(null);
-    setForm({ nome: '', preco: '', categoria: 'Lanches', descricao: '', imagem: '', ativo: true });
+    setForm({ 
+      nome: '', 
+      preco: '', 
+      categoria: categorias[0]?.nome || '', 
+      descricao: '', 
+      imagem: '', 
+      ativo: true 
+    });
   };
 
   const handleCriarComplemento = async (e) => {
@@ -226,7 +287,40 @@ export default function AdminView() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Gerenciar Cardápio / Produtos</h1>
 
-        {/* Formulário de Cadastro/Edição */}
+        {/* SEÇÃO DE GERENCIAR CATEGORIAS DINÂMICAS */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8 border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Categorias do Cardápio</h2>
+          <form onSubmit={handleCriarCategoria} className="flex gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Ex: Combos, Porções, Bebidas"
+              value={novaCategoria}
+              onChange={(e) => setNovaCategoria(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-xl px-4 py-2"
+            />
+            <button type="submit" className="bg-gray-900 text-white px-4 py-2 rounded-xl font-medium hover:bg-gray-800">
+              + Adicionar Categoria
+            </button>
+          </form>
+          
+          <div className="flex flex-wrap gap-2">
+            {categorias.map(cat => (
+              <div key={cat.id} className="flex items-center gap-2 bg-gray-50 border px-3 py-1.5 rounded-xl text-sm font-medium text-gray-700">
+                <span>{cat.nome}</span>
+                <button 
+                  type="button" 
+                  onClick={() => handleDeletarCategoria(cat.id, cat.nome)}
+                  className="text-red-400 hover:text-red-600 font-bold ml-1 text-xs"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            {categorias.length === 0 && <p className="text-xs text-gray-400">Nenhuma categoria criada.</p>}
+          </div>
+        </div>
+
+        {/* FORMULÁRIO DE CADASTRO/EDIÇÃO DE PRODUTO */}
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8 border border-gray-200">
           <h2 className="text-xl font-bold text-gray-800 mb-4">
             {modoEdicao ? 'Editar Produto' : 'Adicionar Novo Item ao Cardápio'}
@@ -270,7 +364,7 @@ export default function AdminView() {
                   className="w-full border border-gray-300 rounded-xl px-4 py-2 bg-white"
                 >
                   {categorias.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat.id} value={cat.nome}>{cat.nome}</option>
                   ))}
                 </select>
               </div>
@@ -326,7 +420,7 @@ export default function AdminView() {
           </form>
         </div>
 
-        {/* Lista de Itens Cadastrados */}
+        {/* LISTA DE ITENS */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-bold text-gray-800">Itens no Cardápio Atual</h2>
@@ -342,7 +436,7 @@ export default function AdminView() {
                 produtos.map((produto) => (
                   <div key={produto.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
                     <div className="flex items-center gap-4">
-                      <img src={produto.imagem || 'https://placehold.co/100x100?text=Burger'} className="w-14 h-14 object-cover rounded-xl border" alt="" />
+                      <img src={produto.imagem_url || 'https://placehold.co/100x100?text=Burger'} className="w-14 h-14 object-cover rounded-xl border" alt="" />
                       <div>
                         <h4 className="font-bold text-gray-900">{produto.nome}</h4>
                         <p className="text-xs text-gray-500 max-w-md truncate">{produto.descricao || 'Sem descrição'}</p>
@@ -380,7 +474,7 @@ export default function AdminView() {
         </div>
       </div>
 
-      {/* MODAL DE GERENCIAMENTO DE COMPLEMENTOS */}
+      {/* MODAL DE COMPLEMENTOS */}
       {produtoParaComplementos && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border max-h-[85vh] flex flex-col">
