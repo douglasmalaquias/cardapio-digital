@@ -1,22 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom'; // Captura o restaurante pela URL
+import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 export default function AdminView() {
-  const { slug } = useParams(); // Pega o slug da URL (ex: minha-hamburgueria)
-  const [estabelecimentoId, setEstabelecimentoId] = useState(null);
+  const { slug } = useParams();
+  const [estabelecimentoId, setEstablishmentId] = useState(null);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [idSendoEditado, setIdSendoEditado] = useState(null);
 
+  // Estados novos para gerenciar a Janela de Adicionais
+  const [produtoParaComplementos, setProdutoParaComplementos] = useState(null);
+  const [complementos, setComplementos] = useState([]);
+  const [formComplemento, setFormComplemento] = useState({ nome: '', preco: '' });
+
   const [form, setForm] = useState({
     nome: '',
     preco: '',
     categoria: 'Lanches',
     descricao: '',
-    imagem: ''
+    imagem: '',
+    ativo: true // Campo de controle de estoque nativo
   });
 
   const categorias = ['Lanches', 'Bebidas', 'Sobremesas'];
@@ -32,20 +38,15 @@ export default function AdminView() {
           .single();
 
         if (error) throw error;
-        if (data) {
-          setEstabelecimentoId(data.id);
-        }
+        if (data) setEstablishmentId(data.id);
       } catch (error) {
         console.error('Erro ao buscar estabelecimento no painel de produtos:', error.message);
       }
     }
-
-    if (slug) {
-      carregarEstabelecimento();
-    }
+    if (slug) carregarEstabelecimento();
   }, [slug]);
 
-  // 2. Carrega apenas os produtos deste estabelecimento específico
+  // 2. Carrega os produtos deste estabelecimento específico
   async function carregarProdutos() {
     if (!estabelecimentoId) return;
     try {
@@ -53,7 +54,7 @@ export default function AdminView() {
       const { data, error } = await supabase
         .from('produtos')
         .select('*')
-        .eq('estabelecimento_id', estabelecimentoId) // Filtro Multi-Tenant
+        .eq('estabelecimento_id', estabelecimentoId)
         .order('id', { ascending: false });
 
       if (error) throw error;
@@ -65,13 +66,29 @@ export default function AdminView() {
     }
   }
 
-  // Dispara a busca de produtos sempre que o estabelecimentoId estiver pronto
   useEffect(() => {
     carregarProdutos();
   }, [estabelecimentoId]);
 
+  // Carrega os complementos do produto selecionado
+  async function carregarComplementos(produtoId) {
+    try {
+      const { data, error } = await supabase
+        .from('produto_complementos')
+        .select('*')
+        .eq('produto_id', produtoId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setComplementos(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar complementos:', error.message);
+    }
+  }
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm({ ...form, [e.target.name]: value });
   };
 
   const handleUploadImagem = async (e) => {
@@ -80,7 +97,6 @@ export default function AdminView() {
       if (!file) return;
 
       setUploading(true);
-
       const fileExt = file.name.split('.').pop();
       const fileName = `produtos-${Date.now()}.${fileExt}`;
 
@@ -115,7 +131,8 @@ export default function AdminView() {
         categoria: form.categoria,
         descricao: form.descricao,
         imagem: form.imagem,
-        estabelecimento_id: estabelecimentoId // Força o vínculo com a loja correta
+        ativo: form.ativo,
+        estabelecimento_id: estabelecimentoId
       };
 
       if (modoEdicao) {
@@ -150,7 +167,8 @@ export default function AdminView() {
       preco: produto.preco || '',
       categoria: produto.categoria || 'Lanches',
       descricao: produto.descricao || '',
-      imagem: produto.imagem || ''
+      imagem: produto.imagem || '',
+      ativo: produto.ativo ?? true
     });
   };
 
@@ -169,7 +187,39 @@ export default function AdminView() {
   const limparFormulario = () => {
     setModoEdicao(false);
     setIdSendoEditado(null);
-    setForm({ nome: '', preco: '', categoria: 'Lanches', descricao: '', imagem: '' });
+    setForm({ nome: '', preco: '', categoria: 'Lanches', descricao: '', imagem: '', ativo: true });
+  };
+
+  // Funções para manipulação direta de Adicionais/Complementos
+  const handleCriarComplemento = async (e) => {
+    e.preventDefault();
+    if (!formComplemento.nome || !formComplemento.preco) return alert('Insira o nome e o preço do adicional!');
+
+    try {
+      const { error } = await supabase
+        .from('produto_complementos')
+        .insert([{
+          produto_id: produtoParaComplementos.id,
+          nome: formComplemento.nome,
+          preco: parseFloat(formComplemento.preco)
+        }]);
+
+      if (error) throw error;
+      setFormComplemento({ nome: '', preco: '' });
+      carregarComplementos(produtoParaComplementos.id);
+    } catch (error) {
+      alert('Erro ao salvar adicional: ' + error.message);
+    }
+  };
+
+  const handleDeletarComplemento = async (id) => {
+    try {
+      const { error } = await supabase.from('produto_complementos').delete().eq('id', id);
+      if (error) throw error;
+      carregarComplementos(produtoParaComplementos.id);
+    } catch (error) {
+      alert('Erro ao remover adicional: ' + error.message);
+    }
   };
 
   return (
@@ -250,60 +300,21 @@ export default function AdminView() {
               />
             </div>
 
+            {/* GATILHO ON/OFF DE ESTOQUE/DISPONIBILIDADE */}
+            <div className="flex items-center gap-2 py-2">
+              <input
+                type="checkbox"
+                name="ativo"
+                id="ativo"
+                checked={form.ativo}
+                onChange={handleChange}
+                className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+              />
+              <label htmlFor="ativo" className="text-sm font-medium text-gray-700 select-none">
+                Item disponível para pedidos nos tablets imediatamente
+              </label>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <button type="submit" className="bg-amber-500 text-white font-medium px-6 py-2 rounded-xl hover:bg-amber-600">
-                {modoEdicao ? 'Salvar Alterações' : 'Cadastrar Produto'}
-              </button>
-              {modoEdicao && (
-                <button type="button" onClick={limparFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-xl">
-                  Cancelar
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-
-        {/* Tabela / Lista de Itens Cadastrados */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">Itens no Cardápio Atual</h2>
-          </div>
-
-          {loading ? (
-            <p className="p-6 text-center text-gray-500">Buscando itens do cardápio...</p>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {produtos.length === 0 ? (
-                <p className="p-6 text-center text-gray-400">Nenhum produto cadastrado para este estabelecimento ainda.</p>
-              ) : (
-                produtos.map((produto) => (
-                  <div key={produto.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
-                    <div className="flex items-center gap-4">
-                      <img src={produto.imagem || 'https://placehold.co/100x100?text=Burger'} className="w-14 h-14 object-cover rounded-xl border" alt="" />
-                      <div>
-                        <h4 className="font-bold text-gray-900">{produto.nome}</h4>
-                        <p className="text-xs text-gray-500 max-w-md truncate">{produto.descricao || 'Sem descrição'}</p>
-                        <div className="flex gap-2 mt-1">
-                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                            {produto.categoria}
-                          </span>
-                          <span className="text-xs font-bold text-gray-700">
-                            R$ {parseFloat(produto.preco).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={() => iniciarEdicao(produto)} className="text-blue-600 text-sm font-semibold hover:underline">Editar</button>
-                      <button onClick={() => handleDeletar(produto.id)} className="text-red-600 text-sm font-semibold hover:underline">Remover</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                {modoEdicao ? '

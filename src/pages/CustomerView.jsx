@@ -36,11 +36,12 @@ export default function CustomerView() {
 
         setEstabelecimento(estData);
 
-        // 2. Busca os produtos atrelados estritamente a este estabelecimento
+        // 2. Busca apenas os produtos ATIVOS atrelados a este estabelecimento
         const { data: prodData, error: prodError } = await supabase
           .from('produtos')
           .select('*')
-          .eq('estabelecimento_id', estData.id);
+          .eq('estabelecimento_id', estData.id)
+          .eq('ativo', true); // <-- FILTRO DE DISPONIBILIDADE ATIVADO
 
         if (prodError) throw prodError;
         setProdutos(prodData || []);
@@ -49,7 +50,7 @@ export default function CustomerView() {
         const { data: adsData, error: adsError } = await supabase
           .from('anuncios')
           .select('*')
-          .eq('ativo', true); // Traz apenas anúncios ligados no Painel Admin
+          .eq('ativo', true);
 
         if (adsError) throw adsError;
         setAnuncios(adsData || []);
@@ -65,6 +66,29 @@ export default function CustomerView() {
       fetchData();
     }
   }, [slug]);
+
+  // Função disparada ao clicar em um produto para carregar seus complementos antes de abrir o modal
+  const handleSelecionarProduto = async (produto) => {
+    try {
+      // Busca os adicionais vinculados ao ID deste produto
+      const { data: complementosData, error } = await supabase
+        .from('produto_complementos')
+        .select('*')
+        .eq('produto_id', produto.id);
+
+      if (error) throw error;
+
+      // Injeta os complementos encontrados dentro do objeto do produto antes de abrir o modal
+      setProdutoSelecionado({
+        ...produto,
+        complementos: complementosData || []
+      });
+    } catch (error) {
+      console.error("Erro ao carregar complementos do produto:", error);
+      // Se der erro nos complementos, abre o modal apenas com o produto básico para não travar a experiência
+      setProdutoSelecionado({ ...produto, complementos: [] });
+    }
+  };
 
   // Filtra os produtos na tela com base na categoria ativa selecionada
   const produtosFiltrados = categoriaAtiva === 'Todos'
@@ -106,7 +130,7 @@ export default function CustomerView() {
         </div>
       </div>
 
-      {/* 📢 BANNER DE PROPAGANDA PATROCINADA (Surgirá se houver anúncios ativos no banco) */}
+      {/* 📢 BANNER DE PROPAGANDA PATROCINADA */}
       {anuncios.length > 0 && (
         <div className="max-w-6xl mx-auto mt-6 px-4">
           {anuncios.map(anuncio => (
@@ -115,7 +139,7 @@ export default function CustomerView() {
         </div>
       )}
 
-      {/* 🏷️ 2. NAVEGAÇÃO DE CATEGORIAS (Quebra de linha responsiva para telas menores/tablets) */}
+      {/* 🏷️ 2. NAVEGAÇÃO DE CATEGORIAS */}
       <div className="max-w-6xl mx-auto mt-8 px-4">
         <div className="flex gap-2 flex-wrap pb-2 items-center">
           {categorias.map(cat => (
@@ -144,14 +168,14 @@ export default function CustomerView() {
               <ProductCard
                 key={produto.id}
                 produto={produto}
-                onSelect={() => setProdutoSelecionado(produto)}
+                onSelect={() => handleSelecionarProduto(produto)} // <-- Dispara a busca com adicionais
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* 🔎 MODAL DE DETALHES DO PRODUTO (Ao clicar no card) */}
+      {/* 🔎 MODAL DE DETALHES DO PRODUTO (Exibirá a lista de adicionais se houver) */}
       {produtoSelecionado && (
         <ProductModal
           produto={produtoSelecionado}
