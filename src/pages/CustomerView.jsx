@@ -9,10 +9,11 @@ export default function CustomerView() {
   const [estabelecimento, setEstabelecimento] = useState(null);
   const [categorias, setCategorias] = useState([]); 
   const [produtos, setProdutos] = useState([]);
+  const [anuncios, setAnuncios] = useState([]); 
   const [categoriaAtiva, setCategoriaAtiva] = useState('');
   const [loading, setLoading] = useState(true);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
-  const [anuncios, setAnuncios] = useState([]);
+
   useEffect(() => {
     async function carregarDadosIniciais() {
       try {
@@ -52,6 +53,17 @@ export default function CustomerView() {
 
           if (prodError) throw prodError;
           setProdutos(prodData || []);
+
+          // 4. Busca Anúncios Ativos usando as colunas em inglês do banco de dados
+          const { data: adsData, error: adsError } = await supabase
+            .from('anuncios')
+            .select('*')
+            .eq('estabelecimento_id', estData.id)
+            .eq('active', true);
+
+          if (!adsError) {
+            setAnuncios(adsData || []);
+          }
         }
       } catch (error) {
         console.error('Erro ao renderizar o cardápio:', error.message);
@@ -120,6 +132,21 @@ export default function CustomerView() {
           </div>
         </div>
       </header>
+
+      {/* Carrossel de Anúncios mapeado com campos do Supabase (image e title) */}
+      {anuncios.length > 0 && (
+        <div className="max-w-6xl mx-auto p-4 overflow-x-auto whitespace-nowrap scrollbar-none flex gap-4">
+          {anuncios.map((anuncio) => (
+            <div key={anuncio.id} className="inline-block min-w-[320px] md:min-w-[450px] h-40 bg-white rounded-2xl overflow-hidden shadow-xs border flex-shrink-0">
+              <img 
+                src={anuncio.image} 
+                alt={anuncio.title} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Categorias Dinâmicas (Navegação por Abas) */}
       <nav className="bg-white border-b sticky top-[69px] z-30 overflow-x-auto scrollbar-none">
