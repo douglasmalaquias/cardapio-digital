@@ -18,12 +18,10 @@ export default function CustomerView() {
       try {
         setLoading(true);
         
-        // 1. Busca os produtos do Supabase
         const { data: produtosData, error: prodError } = await supabase
           .from('produtos')
           .select('*');
           
-        // 2. Busca os anúncios ativos limitados a exatos 2
         const { data: anunciosData, error: advError } = await supabase
           .from('anuncios')
           .select('*')
@@ -44,7 +42,6 @@ export default function CustomerView() {
     fetchData();
   }, []);
 
-  // Filtra os produtos com base na categoria ativa
   const produtosFiltrados = categoriaAtiva === 'Todos'
     ? produtos
     : produtos.filter(p => p.categoria === categoriaAtiva);
@@ -60,7 +57,7 @@ export default function CustomerView() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       
-      {/* 📺 1. SEÇÃO DE ANÚNCIOS (Apenas renderiza se houver anúncios ativos) */}
+      {/* 📺 1. SEÇÃO DE ANÚNCIOS */}
       {anuncios.length > 0 && (
         <div className="max-w-6xl mx-auto mt-6 px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -74,8 +71,8 @@ export default function CustomerView() {
       )}
 
       {/* 🏷️ 2. NAVEGAÇÃO DE CATEGORIAS */}
-      <div className="max-w-6xl mx-auto mt-8">
-        <div className="flex gap-2 flex-nowrap overflow-x-auto pl-4 pr-4 pb-2 items-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="max-w-6xl mx-auto mt-8 px-4">
+        <div className="flex gap-2 flex-nowrap overflow-x-auto pb-2 items-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {categorias.map(cat => (
             <button
               key={cat}
@@ -89,8 +86,8 @@ export default function CustomerView() {
               {cat}
             </button>
           ))}
-          {/* Espaçador invisível de segurança */}
-          <div className="w-6 flex-shrink-0" aria-hidden="true"></div>
+          {/* Espaçador invisível de segurança para não cortar o último botão */}
+          <div className="w-2 flex-shrink-0" aria-hidden="true"></div>
         </div>
       </div>
 
