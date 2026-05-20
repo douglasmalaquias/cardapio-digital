@@ -1,13 +1,26 @@
 import React from 'react';
 
-export default function AdCard({ ad }) {
+export default function AdCard({ anuncio }) {
+  if (!anuncio) return null;
+
+  const titulo = anuncio.title || '';
+  const descricao = anuncio.description || '';
+  const imagem = anuncio.image || '';
+
   return (
-    <div className="relative overflow-hidden rounded-2xl h-40 group cursor-pointer shadow-sm border border-orange-100">
-      <img src={ad.image} alt={ad.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 flex flex-col justify-end">
-        <h3 className="text-white font-bold text-lg leading-tight">{ad.title}</h3>
-        <p className="text-orange-200 text-xs mt-1 line-clamp-2">{ad.description}</p>
+    <div className="min-w-[300px] md:min-w-[450px] bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-6 text-white flex justify-between items-center shadow-md relative overflow-hidden flex-shrink-0">
+      <div className="z-10 max-w-[60%]">
+        <h3 className="text-xl font-bold mb-1">{titulo}</h3>
+        <p className="text-amber-100 text-sm">{descricao}</p>
       </div>
+      {imagem && (
+        <img 
+          src={imagem} 
+          alt={titulo} 
+          className="w-24 h-24 object-cover rounded-xl shadow-md z-10"
+        />
+      )}
+      <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white opacity-10 rounded-full"></div>
     </div>
   );
 }

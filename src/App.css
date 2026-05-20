@@ -182,3 +182,17 @@
     border-right-color: var(--border);
   }
 }
+/* No arquivo src/index.css */
+
+/* Cria a classe .scrollbar-hide para esconder a barra de rolagem */
+
+/* Para navegadores baseados em WebKit (Chrome, Safari, Edge moderno, Opera) */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Para Firefox e Internet Explorer/Edge antigo */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge antigo */
+  scrollbar-width: none;  /* Firefox */
+}

@@ -1,40 +1,24 @@
 import React, { useState } from 'react';
-import { initialMenuData, initialAdsData } from './data/data';
 import CustomerView from './pages/CustomerView';
 import AdminView from './pages/AdminView';
+import AdminAdsView from './pages/AdminAdsView';
+import Header from './components/customer/Header';
 
 export default function App() {
-  const [view, setView] = useState('customer'); 
-  const [menuData, setMenuData] = useState(initialMenuData);
-  const [ads, setAds] = useState(initialAdsData);
-  const [showAdsGlobal, setShowAdsGlobal] = useState(true);
+  // Estados possíveis: 'cliente', 'admin-produtos', 'admin-anuncios'
+  const [telaAtiva, setTelaAtiva] = useState('cliente');
 
   return (
-    <>
-      <div className="fixed bottom-4 right-4 z-50 flex gap-2">
-        <button 
-          onClick={() => setView('customer')} 
-          className={`px-4 py-2 rounded-lg font-bold shadow-lg transition-colors ${view === 'customer' ? 'bg-orange-500 text-white' : 'bg-white'}`}
-        >
-          Ver Cliente
-        </button>
-        <button 
-          onClick={() => setView('admin')} 
-          className={`px-4 py-2 rounded-lg font-bold shadow-lg transition-colors ${view === 'admin' ? 'bg-gray-800 text-white' : 'bg-white'}`}
-        >
-          Ver Admin
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* O Header gerencia a troca de telas de forma oculta */}
+      <Header onMudarTela={setTelaAtiva} />
+
+      {/* Roteamento simples condicional */}
+      {telaAtiva === 'cliente' && <CustomerView />}
+      {telaAtiva === 'admin-produtos' && <AdminView />}
+      {telaAtiva === 'admin-anuncios' && <AdminAdsView />}
       
-      {view === 'customer' ? (
-        <CustomerView menuData={menuData} ads={ads} showAdsGlobal={showAdsGlobal} />
-      ) : (
-        <AdminView 
-          menuData={menuData} setMenuData={setMenuData} 
-          ads={ads} setAds={setAds} 
-          showAdsGlobal={showAdsGlobal} setShowAdsGlobal={setShowAdsGlobal} 
-        />
-      )}
-    </>
+      {/* Botões antigos fixados no rodapé foram completamente removidos daqui! */}
+    </div>
   );
 }
