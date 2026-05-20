@@ -12,7 +12,7 @@ export default function CustomerView() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('');
   const [loading, setLoading] = useState(true);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
-
+  const [anuncios, setAnuncios] = useState([]);
   useEffect(() => {
     async function carregarDadosIniciais() {
       try {
