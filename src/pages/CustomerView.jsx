@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import AdCard from '../components/customer/AdCard';
 import ProductCard from '../components/customer/ProductCard';
 import ProductModal from '../components/customer/ProductModal';
 
 export default function CustomerView() {
+  const { slug } = useParams(); // Captura o restaurante atual pela URL
   const [produtos, setProdutos] = useState([]);
   const [anuncios, setAnuncios] = useState([]);
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos');
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [estabelecimento, setEstabelecimento] = useState(null);
 
   const categorias = ['Todos', 'Lanches', 'Bebidas', 'Sobremesas'];
 
@@ -17,62 +20,103 @@ export default function CustomerView() {
     async function fetchData() {
       try {
         setLoading(true);
-        
-        const { data: produtosData, error: prodError } = await supabase
-          .from('produtos')
-          .select('*');
-          
-        const { data: anunciosData, error: advError } = await supabase
-          .from('anuncios')
+
+        // 1. Busca o estabelecimento pelo slug da URL
+        const { data: estData, error: estError } = await supabase
+          .from('estabelecimentos')
           .select('*')
-          .eq('active', true)
-          .limit(2);
+          .eq('slug', slug)
+          .single();
+
+        if (estError || !estData) {
+          console.error("Estabelecimento não encontrado ou erro na busca:", estError);
+          setLoading(false);
+          return;
+        }
+
+        setEstabelecimento(estData);
+
+        // 2. Busca os produtos atrelados estritamente a este estabelecimento
+        const { data: prodData, error: prodError } = await supabase
+          .from('produtos')
+          .select('*')
+          .eq('estabelecimento_id', estData.id);
 
         if (prodError) throw prodError;
-        if (advError) throw advError;
+        setProdutos(prodData || []);
 
-        setProdutos(produtosData || []);
-        setAnuncios(anunciosData || []);
+        // 3. Busca os anúncios cadastrados (Gatilho Patrocinado)
+        const { data: adsData, error: adsError } = await supabase
+          .from('anuncios')
+          .select('*')
+          .eq('ativo', true); // Traz apenas anúncios ligados no Painel Admin
+
+        if (adsError) throw adsError;
+        setAnuncios(adsData || []);
+
       } catch (error) {
-        console.error('Erro ao buscar dados do banco:', error.message);
+        console.error("Erro geral ao carregar dados do cardápio:", error);
       } finally {
         setLoading(false);
       }
     }
-    fetchData();
-  }, []);
 
+    if (slug) {
+      fetchData();
+    }
+  }, [slug]);
+
+  // Filtra os produtos na tela com base na categoria ativa selecionada
   const produtosFiltrados = categoriaAtiva === 'Todos'
     ? produtos
-    : produtos.filter(p => p.categoria === categoriaAtiva);
+    : produtos.filter(p => p.categoria?.toLowerCase() === categoriaAtiva.toLowerCase());
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-xl font-semibold text-amber-600 animate-pulse">Carregando cardápio...</p>
+        <p className="text-gray-500 font-medium">Carregando cardápio digital...</p>
+      </div>
+    );
+  }
+
+  if (!estabelecimento) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-red-500 font-semibold">404 - Estabelecimento não cadastrado no sistema.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      
-      {/* 📺 1. SEÇÃO DE ANÚNCIOS */}
+    <div className="pb-24">
+      {/* 🥞 1. BANNER DO TOPO & IDENTIFICAÇÃO DO ESTABELECIMENTO */}
+      <div className="bg-white shadow-sm border-b border-gray-100 py-6 px-4">
+        <div className="max-w-6xl mx-auto flex items-center gap-4">
+          {estabelecimento.logo_url && (
+            <img 
+              src={estabelecimento.logo_url} 
+              alt={`Logo ${estabelecimento.nome}`} 
+              className="w-16 h-16 rounded-full object-cover border border-gray-200"
+            />
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">{estabelecimento.nome}</h1>
+            <p className="text-sm text-gray-400">Cardápio Interativo via Tablet</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 📢 BANNER DE PROPAGANDA PATROCINADA (Surgirá se houver anúncios ativos no banco) */}
       {anuncios.length > 0 && (
         <div className="max-w-6xl mx-auto mt-6 px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {anuncios.map(anuncio => (
-              <div key={anuncio.id} className="w-full flex">
-                <AdCard skind="ad" anuncio={anuncio} />
-              </div>
-            ))}
-          </div>
+          {anuncios.map(anuncio => (
+            <AdCard key={anuncio.id} anuncio={anuncio} />
+          ))}
         </div>
       )}
 
-      {/* 🏷️ 2. NAVEGAÇÃO DE CATEGORIAS (Agora com quebra de linha responsiva) */}
+      {/* 🏷️ 2. NAVEGAÇÃO DE CATEGORIAS (Quebra de linha responsiva para telas menores/tablets) */}
       <div className="max-w-6xl mx-auto mt-8 px-4">
-        {/* Trocamos flex-nowrap por flex-wrap e removemos o scroll horizontal */}
         <div className="flex gap-2 flex-wrap pb-2 items-center">
           {categorias.map(cat => (
             <button
@@ -90,45 +134,28 @@ export default function CustomerView() {
         </div>
       </div>
 
-      {/* 🍔 3. LISTAGEM DE PRODUTOS */}
-      <main className="max-w-6xl mx-auto px-4 mt-6">
-        <div className="flex items-center justify-between mb-6 gap-2">
-          <h2 className="text-2xl font-black text-gray-800">{categoriaAtiva}</h2>
-          <span className="text-gray-500 font-medium bg-gray-200 px-3 py-1 rounded-full text-sm">
-            {produtosFiltrados.length} itens
-          </span>
-        </div>
-        
+      {/* 🍔 3. LISTAGEM DE PRODUTOS FILTRADOS */}
+      <div className="max-w-6xl mx-auto mt-6 px-4">
         {produtosFiltrados.length === 0 ? (
-          <div className="w-full bg-white rounded-2xl p-8 text-center border border-gray-100">
-            <p className="text-gray-500 font-medium">Nenhum produto cadastrado nesta categoria.</p>
-          </div>
+          <p className="text-gray-400 text-center py-12">Nenhum item disponível nesta categoria.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {produtosFiltrados.map(prod => (
-              <ProductCard 
-                key={prod.id} 
-                produto={{
-                  id: prod.id,
-                  nome: prod.nome,
-                  preco: prod.preco,
-                  categoria: prod.categoria,
-                  description: prod.descricao,
-                  image: prod.imagem_url,
-                  nutrition: prod.info_nutricional
-                }} 
-                onVerDetalhes={setProdutoSelecionado} 
+            {produtosFiltrados.map(produto => (
+              <ProductCard
+                key={produto.id}
+                produto={produto}
+                onSelect={() => setProdutoSelecionado(produto)}
               />
             ))}
           </div>
         )}
-      </main>
+      </div>
 
-      {/* Modal de Detalhes do Produto */}
+      {/* 🔎 MODAL DE DETALHES DO PRODUTO (Ao clicar no card) */}
       {produtoSelecionado && (
-        <ProductModal 
-          produto={produtoSelecionado} 
-          onClose={() => setProdutoSelecionado(null)} 
+        <ProductModal
+          produto={produtoSelecionado}
+          onClose={() => setProdutoSelecionado(null)}
         />
       )}
     </div>
