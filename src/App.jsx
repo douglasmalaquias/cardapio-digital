@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
 import CustomerView from './pages/CustomerView';
 import AdminView from './pages/AdminView';
 import AdminAdsView from './pages/AdminAdsView';
@@ -8,15 +9,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rota dinâmica do cliente: aceita qualquer slug de restaurante após a barra */}
+        {/* Rota Inicial / Hub Central da Plataforma */}
+        <Route path="/" element={<Home />} />
+
+        {/* Rota dinâmica do cliente tablet: aceita qualquer slug de restaurante */}
         <Route path="/:slug" element={<CustomerView />} />
 
-        {/* Rotas da administração */}
-<Route path="/admin/:slug/produtos" element={<AdminView />} />
-<Route path="/admin/:slug/anuncios" element={<AdminAdsView />} />
-
-        {/* Se alguém entrar na raiz sem nada, redireciona temporariamente para o nosso teste */}
-        <Route path="*" element={<Navigate to="/minha-hamburgueria" replace />} />
+        {/* Rotas de administração do lojista e anúncios */}
+        <Route path="/admin/:slug/produtos" element={<AdminView />} />
+        <Route path="/admin/:slug/anuncios" element={<AdminAdsView />} />
       </Routes>
     </BrowserRouter>
   );
