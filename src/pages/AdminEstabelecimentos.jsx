@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 export default function AdminEstabelecimentos() {
-  const navigate = useNavigate();
   const [estabelecimentos, setEstabelecimentos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  
   const [novoNome, setNovoNome] = useState('');
   const [novoSlug, setNovoSlug] = useState('');
   const [novoLogoUrl, setNovoLogoUrl] = useState('');
+  
+  const navigate = useNavigate();
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   // 1. Verificação de Segurança (Autenticação)
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function AdminEstabelecimentos() {
     verificarSessao();
   }, [navigate]);
 
-  // 2. Carrega a lista ao abrir a tela
+  // 2. Carrega a lista de estabelecimentos após validar a sessão
   useEffect(() => {
     if (checkingAuth) return;
     carregarEstabelecimentos();
@@ -42,16 +42,17 @@ export default function AdminEstabelecimentos() {
     setLoading(false);
   }
 
-  // 3. Função para salvar um novo estabelecimento no banco
+  // Função para salvar um novo estabelecimento no banco
   async function handleAdicionar(e) {
     e.preventDefault();
     if (!novoNome || !novoSlug) return alert('Preencha o nome e o slug!');
 
+    // Insere no Supabase incluindo a coluna logo_url
     const { error } = await supabase.from('estabelecimentos').insert([
       { 
         nome: novoNome, 
         slug: novoSlug,
-        logo_url: novoLogoUrl || null 
+        logo_url: novoLogoUrl || null
       }
     ]);
 
@@ -66,31 +67,26 @@ export default function AdminEstabelecimentos() {
     }
   }
 
+  // Tela de loading enquanto verifica segurança
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">
-        A validar credenciais de segurança...
-      </div>
-    );
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">A validar credenciais...</div>;
   }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
         
-        {/* Cabeçalho com botão de voltar */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div>
-            <button 
-              onClick={() => navigate('/')} 
-              className="text-sm text-gray-500 font-bold hover:underline mb-1 block"
-            >
-              ← Voltar ao Hub Central
-            </button>
-            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
-              Gestão de Estabelecimentos (SaaS)
-            </h1>
-          </div>
+        {/* CABEÇALHO COM BOTÃO VOLTAR */}
+        <div className="mb-6">
+          <button 
+            onClick={() => navigate('/')} 
+            className="text-sm text-gray-500 font-bold hover:underline mb-2 block"
+          >
+            ← Voltar ao Hub Central
+          </button>
+          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
+            Gestão de Estabelecimentos
+          </h1>
         </div>
 
         {/* Formulário para Adicionar Novo */}
@@ -101,7 +97,7 @@ export default function AdminEstabelecimentos() {
           <form onSubmit={handleAdicionar} className="flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="w-full">
-                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nome do Estabelecimento</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nome do Estabelecimento</label>
                 <input
                   type="text"
                   value={novoNome}
@@ -112,7 +108,7 @@ export default function AdminEstabelecimentos() {
               </div>
               
               <div className="w-full">
-                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Slug (Link Público)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Slug (Link Público)</label>
                 <input
                   type="text"
                   value={novoSlug}
@@ -123,7 +119,7 @@ export default function AdminEstabelecimentos() {
               </div>
 
               <div className="w-full">
-                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">URL da Logo (Imagem)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">URL da Logo (Imagem)</label>
                 <input
                   type="text"
                   value={novoLogoUrl}
@@ -146,14 +142,14 @@ export default function AdminEstabelecimentos() {
         </div>
 
         {/* Tabela de Estabelecimentos Cadastrados */}
-        <div className="bg-white rounded-3xl shadow-xs border overflow-hidden">
-          <table className="w-full text-left border-collapse">
+        <div className="bg-white rounded-3xl shadow-xs border overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
             <thead className="bg-gray-100 border-b">
               <tr>
-                <th className="p-4 text-xs font-bold text-gray-600 uppercase w-20">Logo</th>
-                <th className="p-4 text-xs font-bold text-gray-600 uppercase">Nome</th>
-                <th className="p-4 text-xs font-bold text-gray-600 uppercase">Link (Slug)</th>
-                <th className="p-4 text-xs font-bold text-gray-600 uppercase text-center">Ações</th>
+                <th className="p-4 text-sm font-bold text-gray-600 uppercase w-20">Logo</th>
+                <th className="p-4 text-sm font-bold text-gray-600 uppercase">Nome</th>
+                <th className="p-4 text-sm font-bold text-gray-600 uppercase">Link (Slug)</th>
+                <th className="p-4 text-sm font-bold text-gray-600 uppercase text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
