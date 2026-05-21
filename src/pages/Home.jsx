@@ -82,7 +82,7 @@ export default function Home() {
               Gerir Campanhas de Anúncios
             </button>
             <button 
-              onClick={() => alert('Interface de cadastro de novas lojas integrada em breve!')}
+              onClick={() => navigate('/admin/clientes')}
               className="w-full border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm py-2.5 rounded-xl transition-all"
             >
               Painel de Clientes SaaS
