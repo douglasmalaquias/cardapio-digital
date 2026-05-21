@@ -1,16 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 
 export default function Home() {
   const navigate = useNavigate();
   const [slugInput, setSlugInput] = useState('');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Executa assim que a página abre para verificar se o utilizador está logado
+  useEffect(() => {
+    async function verificarSessao() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        // Se não houver utilizador ativo, expulsa para a tela de login
+        navigate('/login');
+      } else {
+        // Se estiver logado, liberta o ecrã
+        setCheckingAuth(false);
+      }
+    }
+    verificarSessao();
+  }, [navigate]);
 
   const acessarPainelLojista = (e) => {
     e.preventDefault();
     if (!slugInput.trim()) return alert('Por favor, introduza o código/slug da sua loja!');
-    // Redireciona para o painel de produtos do restaurante digitado
     navigate(`/admin/${slugInput.trim().toLowerCase()}/produtos`);
   };
+
+  // Enquanto verifica o banco de dados, mostra uma tela neutra
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">
+        A validar credenciais de segurança...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-gray-900">
