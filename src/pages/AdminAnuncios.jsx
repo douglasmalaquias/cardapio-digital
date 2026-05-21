@@ -53,7 +53,7 @@ export default function AdminAnuncios() {
         setAnuncios(adsData || []);
       } catch (err) {
         console.error(err);
-      } finally {
+      } finaly {
         setLoading(false);
       }
     }
@@ -63,7 +63,7 @@ export default function AdminAnuncios() {
   async function handleCadastrar(e) {
     e.preventDefault();
     if (!titulo) return alert('Insira um título interno!');
-    if (!imageUrl && !imagemArquivo) return alert('Selecione uma imagem ou insira uma URL!');
+    if (!imageUrl && !imagemArquivo) return alert('Selecione um arquivo de imagem ou insira um link de URL!');
 
     try {
       setUploading(true);
@@ -95,11 +95,14 @@ export default function AdminAnuncios() {
 
       if (error) throw error;
 
-      alert('Banner de anúncio adicionado!');
+      alert('Banner de anúncio adicionado com sucesso!');
       setTitulo('');
       setImageUrl('');
       setImagemArquivo(null);
-      document.getElementById('fileInputAd').value = '';
+      
+      if (document.getElementById('fileInputAd')) {
+        document.getElementById('fileInputAd').value = '';
+      }
       
       const { data: adsData } = await supabase
         .from('anuncios')
@@ -109,7 +112,7 @@ export default function AdminAnuncios() {
 
     } catch (error) {
       alert('Erro ao processar anúncio: ' + error.message);
-    } final {
+    } finally {
       setUploading(false);
     }
   }
@@ -151,11 +154,11 @@ export default function AdminAnuncios() {
         <div className="bg-white p-6 rounded-3xl shadow-xs border mb-8">
           <form onSubmit={handleCadastrar} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título (Interno)</label>
-              <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ex: Promoção Hamburguer de Quinta" />
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título do Banner</label>
+              <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ex: Banner Promocional Combo Fim de Semana" />
             </div>
 
-            {/* BOX DUPLO IMAGEM BANNER */}
+            {/* SELEÇÃO DUPLA DE BANNER */}
             <div className="bg-gray-50 p-4 rounded-2xl border border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção A: Upload de Banner Local</label>
@@ -164,8 +167,10 @@ export default function AdminAnuncios() {
                   type="file" 
                   accept="image/*"
                   onChange={(e) => {
-                    setImagemArquivo(e.target.files[0]);
-                    setImageUrl('');
+                    if (e.target.files[0]) {
+                      setImagemArquivo(e.target.files[0]);
+                      setImageUrl('');
+                    }
                   }}
                   className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-900 file:text-white hover:file:bg-gray-800 cursor-pointer"
                 />
@@ -175,17 +180,22 @@ export default function AdminAnuncios() {
                 <input 
                   type="text" 
                   value={imageUrl} 
-                  disabled={!!imagemArquivo}
-                  onChange={(e) => setImageUrl(e.target.value)} 
-                  className="w-full border rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-gray-900 disabled:opacity-40" 
-                  placeholder="https://site.com/banner.jpg" 
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    if (e.target.value && document.getElementById('fileInputAd')) {
+                      setImagemArquivo(null);
+                      document.getElementById('fileInputAd').value = '';
+                    }
+                  }} 
+                  className="w-full border border-gray-300 bg-white rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-gray-900" 
+                  placeholder="https://site.com/imagem-banner.jpg" 
                 />
               </div>
             </div>
 
             <div className="flex justify-end">
               <button type="submit" disabled={uploading} className="w-full md:w-auto bg-amber-500 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-600 transition-colors disabled:opacity-50">
-                {uploading ? 'Fazendo Upload...' : 'Adicionar Banner'}
+                {uploading ? 'Enviando mídia...' : 'Adicionar Banner'}
               </button>
             </div>
           </form>
@@ -204,11 +214,6 @@ export default function AdminAnuncios() {
               </div>
             </div>
           ))}
-          {anuncios.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-400 bg-white border rounded-2xl border-dashed">
-              Nenhum banner ativo no momento.
-            </div>
-          )}
         </div>
 
       </div>
