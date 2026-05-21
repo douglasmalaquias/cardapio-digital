@@ -33,8 +33,6 @@ export default function Home() {
   const acessarPainelLojista = (e) => {
     e.preventDefault();
     if (!slugInput.trim()) return alert('Por favor, introduza o código/slug da sua loja!');
-    
-    // NAVEGAÇÃO REAL ATIVADA AQUI:
     navigate(`/admin/${slugInput.trim().toLowerCase()}/produtos`);
   };
 
@@ -127,7 +125,12 @@ export default function Home() {
             <div className="pt-4 border-t space-y-2">
               <button 
                 type="button"
-                onClick={() => alert('Interface de Gestão de Anúncios em breve!')}
+                onClick={() => {
+                  const lojaSlug = window.prompt('Qual o código/slug da loja que receberá o anúncio? (Ex: lanchonete-teste)');
+                  if (lojaSlug) {
+                    navigate(`/admin/${lojaSlug.trim().toLowerCase()}/anuncios`);
+                  }
+                }}
                 className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
               >
                 Gestão de Anúncios
