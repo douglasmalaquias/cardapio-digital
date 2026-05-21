@@ -118,15 +118,29 @@ export default function CustomerView() {
       {/* Cabeçalho */}
       <header className="bg-white border-b sticky top-0 z-40 p-4 shadow-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-gray-900 uppercase">
-              {estabelecimento.nome}
-            </h1>
-            <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Tablet Conectado / Autoatendimento
-            </p>
+          
+          {/* Agrupamento da Logo + Textos */}
+          <div className="flex items-center gap-3">
+            {/* Se o estabelecimento tiver logo, ela aparece aqui arredondada */}
+            {estabelecimento.logo_url && (
+              <img 
+                src={estabelecimento.logo_url} 
+                alt={Logo ${estabelecimento.nome}} 
+                className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover border border-gray-200 shadow-sm"
+              />
+            )}
+            
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-gray-900 uppercase">
+                {estabelecimento.nome}
+              </h1>
+              <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Tablet Conectado / Autoatendimento
+              </p>
+            </div>
           </div>
+
           <div className="bg-gray-100 px-3 py-1 rounded-full text-xs font-bold text-gray-600">
             Mesa 04
           </div>
