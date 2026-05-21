@@ -12,10 +12,8 @@ export default function Home() {
     async function verificarSessao() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        // Se não houver utilizador ativo, expulsa para a tela de login
         navigate('/login');
       } else {
-        // Se estiver logado, liberta o ecrã
         setCheckingAuth(false);
       }
     }
@@ -28,7 +26,7 @@ export default function Home() {
     if (error) {
       alert('Erro ao sair do sistema: ' + error.message);
     } else {
-      navigate('/login'); // Redireciona para o login após deslogar com sucesso
+      navigate('/login');
     }
   };
 
@@ -36,13 +34,10 @@ export default function Home() {
     e.preventDefault();
     if (!slugInput.trim()) return alert('Por favor, introduza o código/slug da sua loja!');
     
-    // Alerta temporário de feedback para o botão funcionar enquanto a página não é criada
-    alert(`Acessando o Painel de Controle da loja: ${slugInput.trim().toLowerCase()} (Interface de produtos em desenvolvimento)`);
-    // Futuramente, quando criar a página de produtos, basta reativar a linha abaixo:
-    // navigate(`/admin/${slugInput.trim().toLowerCase()}/produtos`);
+    // NAVEGAÇÃO REAL ATIVADA AQUI:
+    navigate(`/admin/${slugInput.trim().toLowerCase()}/produtos`);
   };
 
-  // Enquanto verifica o banco de dados, mostra uma tela neutra
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">
