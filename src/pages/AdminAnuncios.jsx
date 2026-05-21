@@ -53,17 +53,17 @@ export default function AdminAnuncios() {
         setAnuncios(adsData || []);
       } catch (err) {
         console.error(err);
-      } finaly {
+      } finally {
         setLoading(false);
       }
     }
     carregarDados();
   }, [slug, checkingAuth, navigate]);
 
-  async function handleCadastrar(e) {
+  async function handleCampanha(e) {
     e.preventDefault();
     if (!titulo) return alert('Insira um título interno!');
-    if (!imageUrl && !imagemArquivo) return alert('Selecione um arquivo de imagem ou insira um link de URL!');
+    if (!imageUrl && !imagemArquivo) return alert('Selecione uma imagem ou insira uma URL!');
 
     try {
       setUploading(true);
@@ -95,14 +95,11 @@ export default function AdminAnuncios() {
 
       if (error) throw error;
 
-      alert('Banner de anúncio adicionado com sucesso!');
+      alert('Banner de anúncio adicionado!');
       setTitulo('');
       setImageUrl('');
       setImagemArquivo(null);
-      
-      if (document.getElementById('fileInputAd')) {
-        document.getElementById('fileInputAd').value = '';
-      }
+      document.getElementById('fileInputAd').value = '';
       
       const { data: adsData } = await supabase
         .from('anuncios')
@@ -138,7 +135,7 @@ export default function AdminAnuncios() {
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <button onClick={() => navigate('/')} className="text-sm text-gray-500 font-bold hover:underline mb-1 block">
+            <button type="button" onClick={() => navigate('/')} className="text-sm text-gray-500 font-bold hover:underline mb-1 block cursor-pointer">
               ← Voltar ao Hub Central
             </button>
             <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
@@ -152,13 +149,13 @@ export default function AdminAnuncios() {
 
         {/* Form de Cadastro */}
         <div className="bg-white p-6 rounded-3xl shadow-xs border mb-8">
-          <form onSubmit={handleCadastrar} className="space-y-4">
+          <form onSubmit={handleCampanha} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título do Banner</label>
-              <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ex: Banner Promocional Combo Fim de Semana" />
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título (Interno)</label>
+              <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ex: Promoção Hamburguer de Quinta" />
             </div>
 
-            {/* SELEÇÃO DUPLA DE BANNER */}
+            {/* BOX DUPLO IMAGEM BANNER */}
             <div className="bg-gray-50 p-4 rounded-2xl border border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção A: Upload de Banner Local</label>
@@ -167,10 +164,8 @@ export default function AdminAnuncios() {
                   type="file" 
                   accept="image/*"
                   onChange={(e) => {
-                    if (e.target.files[0]) {
-                      setImagemArquivo(e.target.files[0]);
-                      setImageUrl('');
-                    }
+                    setImagemArquivo(e.target.files[0]);
+                    setImageUrl('');
                   }}
                   className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-900 file:text-white hover:file:bg-gray-800 cursor-pointer"
                 />
@@ -180,22 +175,17 @@ export default function AdminAnuncios() {
                 <input 
                   type="text" 
                   value={imageUrl} 
-                  onChange={(e) => {
-                    setImageUrl(e.target.value);
-                    if (e.target.value && document.getElementById('fileInputAd')) {
-                      setImagemArquivo(null);
-                      document.getElementById('fileInputAd').value = '';
-                    }
-                  }} 
-                  className="w-full border border-gray-300 bg-white rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-gray-900" 
-                  placeholder="https://site.com/imagem-banner.jpg" 
+                  disabled={!!imagemArquivo}
+                  onChange={(e) => setImageUrl(e.target.value)} 
+                  className="w-full border rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-gray-900 disabled:opacity-40" 
+                  placeholder="https://site.com/banner.jpg" 
                 />
               </div>
             </div>
 
             <div className="flex justify-end">
-              <button type="submit" disabled={uploading} className="w-full md:w-auto bg-amber-500 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-600 transition-colors disabled:opacity-50">
-                {uploading ? 'Enviando mídia...' : 'Adicionar Banner'}
+              <button type="submit" disabled={uploading} className="w-full md:w-auto bg-amber-500 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-600 transition-colors disabled:opacity-50 cursor-pointer">
+                {uploading ? 'Fazendo Upload...' : 'Adicionar Banner'}
               </button>
             </div>
           </form>
@@ -208,12 +198,17 @@ export default function AdminAnuncios() {
               <img src={anuncio.image} alt={anuncio.title} className="w-full h-48 object-cover" />
               <div className="p-4 flex justify-between items-center">
                 <span className="font-bold text-gray-800">{anuncio.title}</span>
-                <button onClick={() => handleApagar(anuncio.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors">
+                <button onClick={() => handleApagar(anuncio.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors cursor-pointer">
                   Apagar
                 </button>
               </div>
             </div>
           ))}
+          {anuncios.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-400 bg-white border rounded-2xl border-dashed">
+              Nenhum banner ativo no momento.
+            </div>
+          )}
         </div>
 
       </div>
