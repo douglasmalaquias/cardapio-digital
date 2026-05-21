@@ -85,7 +85,7 @@ export default function AdminProdutos() {
       setUploading(true);
       let finalImageUrl = imageUrl;
 
-      // Se houver arquivo local selecionado, faz o upload para o Storage primeiro
+      // Se houver arquivo local, faz o upload para o Storage primeiro
       if (imagemArquivo) {
         const fileExt = imagemArquivo.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
@@ -97,12 +97,10 @@ export default function AdminProdutos() {
 
         if (uploadError) throw uploadError;
 
-        // Captura a URL pública gerada pelo Supabase
         const { data } = supabase.storage.from('imagens').getPublicUrl(filePath);
         finalImageUrl = data.publicUrl;
       }
 
-      // IMPORTANTE: Se o seu banco rejeitar 'image_url', mude o nome do campo abaixo para 'image' ou 'foto'
       const { error: insertError } = await supabase.from('produtos').insert([
         {
           estabelecimento_id: estabelecimento.id,
@@ -124,10 +122,10 @@ export default function AdminProdutos() {
       setImageUrl('');
       setImagemArquivo(null);
       
-      // Reinicia o campo de arquivo visualmente
-      document.getElementById('fileInput').value = '';
+      if (document.getElementById('fileInput')) {
+        document.getElementById('fileInput').value = '';
+      }
 
-      // Atualiza a lista
       const { data: prodData } = await supabase
         .from('produtos')
         .select('*')
@@ -136,7 +134,7 @@ export default function AdminProdutos() {
       setProdutos(prodData || []);
 
     } catch (error) {
-      alert('Erro no processo de cadastro: ' + error.message);
+      alert('Erro ao cadastrar: ' + error.message);
     } finally {
       setUploading(false);
     }
@@ -191,10 +189,10 @@ export default function AdminProdutos() {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Descrição dos Ingredientes</label>
-              <input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: Pão brioche, 2x blends de 150g, muito queijo cheddar..." />
+              <input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: Pão brioche, 2x blends de 150g..." />
             </div>
 
-            {/* MÓDULO DUPLO DE IMAGEM */}
+            {/* SELEÇÃO DUPLA DE IMAGEM */}
             <div className="bg-gray-50 p-4 rounded-2xl border border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção A: Upload de Foto Local</label>
@@ -203,8 +201,10 @@ export default function AdminProdutos() {
                   type="file" 
                   accept="image/*"
                   onChange={(e) => {
-                    setImagemArquivo(e.target.files[0]);
-                    setImageUrl(''); // Limpa a URL se escolheu arquivo
+                    if (e.target.files[0]) {
+                      setImagemArquivo(e.target.files[0]);
+                      setImageUrl(''); // Limpa o link de texto para priorizar o arquivo
+                    }
                   }}
                   className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-900 file:text-white hover:file:bg-gray-800 cursor-pointer"
                 />
@@ -214,23 +214,28 @@ export default function AdminProdutos() {
                 <input 
                   type="text" 
                   value={imageUrl} 
-                  disabled={!!imagemArquivo}
-                  onChange={(e) => setImageUrl(e.target.value)} 
-                  className="w-full border rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-40" 
-                  placeholder="https://site.com/foto.jpg" 
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    if (e.target.value && document.getElementById('fileInput')) {
+                      setImagemArquivo(null); // Limpa o arquivo se digitou uma URL
+                      document.getElementById('fileInput').value = '';
+                    }
+                  }} 
+                  className="w-full border border-gray-300 bg-white rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500" 
+                  placeholder="https://site.com/foto-produto.jpg" 
                 />
               </div>
             </div>
 
             <div className="flex justify-end pt-2">
               <button type="submit" disabled={uploading} className="bg-gray-900 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors disabled:opacity-50">
-                {uploading ? 'Processando dados...' : 'Salvar Produto'}
+                {uploading ? 'Salvando item...' : 'Salvar Produto'}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Tabela de Produtos */}
+        {/* Lista de Produtos */}
         <div className="bg-white rounded-3xl shadow-xs border overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-100 border-b">
@@ -259,11 +264,6 @@ export default function AdminProdutos() {
                   <td className="p-4 text-sm font-bold text-gray-800">R$ {prod.preco.toFixed(2)}</td>
                 </tr>
               ))}
-              {produtos.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="p-6 text-center text-gray-500 text-sm">Nenhum produto cadastrado neste estabelecimento.</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
