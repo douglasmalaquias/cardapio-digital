@@ -8,6 +8,8 @@ export default function AdminEstabelecimentos() {
   const [novoNome, setNovoNome] = useState('');
   const [novoSlug, setNovoSlug] = useState('');
   const [novoLogoUrl, setNovoLogoUrl] = useState('');
+  const [imagemArquivo, setImagemArquivo] = useState(null);
+  const [uploading, setUploading] = useState(false);
   
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -42,45 +44,76 @@ export default function AdminEstabelecimentos() {
     setLoading(false);
   }
 
-  // Função para salvar um novo estabelecimento no banco
+  // 3. Função para salvar um novo estabelecimento no banco
   async function handleAdicionar(e) {
     e.preventDefault();
     if (!novoNome || !novoSlug) return alert('Preencha o nome e o slug!');
 
-    // Insere no Supabase incluindo a coluna logo_url
-    const { error } = await supabase.from('estabelecimentos').insert([
-      { 
-        nome: novoNome, 
-        slug: novoSlug,
-        logo_url: novoLogoUrl || null
-      }
-    ]);
+    try {
+      setUploading(true);
+      let finalLogoUrl = novoLogoUrl;
 
-    if (error) {
-      alert('Erro ao criar: ' + error.message);
-    } else {
+      // Se houver arquivo de imagem local selecionado, faz upload para o Storage
+      if (imagemArquivo) {
+        const fileExt = imagemArquivo.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('imagens')
+          .upload(filePath, imagemArquivo);
+
+        if (uploadError) throw uploadError;
+
+        // Captura a URL pública gerada no bucket do Supabase
+        const { data } = supabase.storage.from('imagens').getPublicUrl(filePath);
+        finalLogoUrl = data.publicUrl;
+      }
+
+      // Insere na tabela estabelecimentos
+      const { error: insertError } = await supabase.from('estabelecimentos').insert([
+        { 
+          nome: novoNome, 
+          slug: novoSlug,
+          logo_url: finalLogoUrl || null
+        }
+      ]);
+
+      if (insertError) throw insertError;
+
+      alert('Estabelecimento criado com sucesso!');
       setNovoNome('');
       setNovoSlug('');
       setNovoLogoUrl('');
-      carregarEstabelecimentos(); // Atualiza a tabela na tela
-      alert('Estabelecimento criado com sucesso!');
+      setImagemArquivo(null);
+      document.getElementById('fileInputLogo').value = '';
+      carregarEstabelecimentos(); 
+
+    } catch (error) {
+      alert('Erro ao criar estabelecimento: ' + error.message);
+    } final {
+      setUploading(false);
     }
   }
 
-  // Tela de loading enquanto verifica segurança
   if (checkingAuth) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">A validar credenciais...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">
+        Validando credenciais de segurança...
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
         
-        {/* CABEÇALHO COM BOTÃO VOLTAR */}
+        {/* CABEÇALHO COM BOTÃO VOLTAR REAL */}
         <div className="mb-6">
           <button 
+            type="button"
             onClick={() => navigate('/')} 
-            className="text-sm text-gray-500 font-bold hover:underline mb-2 block"
+            className="text-sm text-amber-600 font-bold hover:underline mb-2 block cursor-pointer"
           >
             ← Voltar ao Hub Central
           </button>
@@ -94,38 +127,55 @@ export default function AdminEstabelecimentos() {
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
             Adicionar Novo Cliente
           </h2>
-          <form onSubmit={handleAdicionar} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <form onSubmit={handleAdicionar} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="w-full">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nome do Estabelecimento</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nome do Mercearia / Hamburgueria</label>
                 <input
                   type="text"
                   value={novoNome}
                   onChange={(e) => setNovoNome(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                  className="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-sm"
                   placeholder="Ex: Padaria do Zé"
                 />
               </div>
               
               <div className="w-full">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Slug (Link Público)</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Slug (Link Público)</label>
                 <input
                   type="text"
                   value={novoSlug}
                   onChange={(e) => setNovoSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-                  className="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                  className="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-sm"
                   placeholder="Ex: padaria-do-ze"
                 />
               </div>
+            </div>
 
-              <div className="w-full">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">URL da Logo (Imagem)</label>
-                <input
-                  type="text"
-                  value={novoLogoUrl}
-                  onChange={(e) => setNovoLogoUrl(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                  placeholder="Ex: https://linkdaimagem.com/logo.png"
+            {/* CAIXA DUPLA: SELEÇÃO DE ARQUIVO LOCAL OU LINK EXTERNO */}
+            <div className="bg-gray-50 p-4 rounded-2xl border border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção A: Upload de Logo Local</label>
+                <input 
+                  id="fileInputLogo"
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => {
+                    setImagemArquivo(e.target.files[0]);
+                    setNovoLogoUrl(''); // Limpa campo de URL para priorizar o arquivo
+                  }}
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-900 file:text-white hover:file:bg-gray-800 cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção B: Link da Logo (URL)</label>
+                <input 
+                  type="text" 
+                  value={novoLogoUrl} 
+                  disabled={!!imagemArquivo}
+                  onChange={(e) => setNovoLogoUrl(e.target.value)} 
+                  className="w-full border rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-40" 
+                  placeholder="https://linkdaimagem.com/logo.png" 
                 />
               </div>
             </div>
@@ -133,9 +183,10 @@ export default function AdminEstabelecimentos() {
             <div className="flex justify-end mt-2">
               <button 
                 type="submit" 
-                className="w-full md:w-auto bg-gray-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-gray-800 transition-colors text-sm"
+                disabled={uploading}
+                className="w-full md:w-auto bg-gray-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 cursor-pointer"
               >
-                Cadastrar Estabelecimento
+                {uploading ? 'Salvando dados...' : 'Cadastrar Estabelecimento'}
               </button>
             </div>
           </form>
