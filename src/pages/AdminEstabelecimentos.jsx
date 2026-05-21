@@ -6,6 +6,7 @@ export default function AdminEstabelecimentos() {
   const [loading, setLoading] = useState(true);
   const [novoNome, setNovoNome] = useState('');
   const [novoSlug, setNovoSlug] = useState('');
+  const [novoLogoUrl, setNovoLogoUrl] = useState('');
 
   // Carrega a lista ao abrir a tela
   useEffect(() => {
@@ -28,9 +29,13 @@ export default function AdminEstabelecimentos() {
     e.preventDefault();
     if (!novoNome || !novoSlug) return alert('Preencha o nome e o slug!');
 
-    // Tenta inserir no Supabase
+    // Insere no Supabase incluindo a coluna logo_url
     const { error } = await supabase.from('estabelecimentos').insert([
-      { nome: novoNome, slug: novoSlug }
+      { 
+        nome: novoNome, 
+        slug: novoSlug,
+        logo_url: novoLogoUrl || null // Se estiver vazio, salva como NULL
+      }
     ]);
 
     if (error) {
@@ -38,6 +43,7 @@ export default function AdminEstabelecimentos() {
     } else {
       setNovoNome('');
       setNovoSlug('');
+      setNovoLogoUrl('');
       carregarEstabelecimentos(); // Atualiza a tabela na tela
       alert('Estabelecimento criado com sucesso!');
     }
@@ -45,7 +51,7 @@ export default function AdminEstabelecimentos() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-black text-gray-800 mb-6 uppercase tracking-tight">
           Gestão de Estabelecimentos
         </h1>
@@ -55,33 +61,50 @@ export default function AdminEstabelecimentos() {
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
             Adicionar Novo Cliente
           </h2>
-          <form onSubmit={handleAdicionar} className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 w-full">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Nome do Estabelecimento</label>
-              <input
-                type="text"
-                value={novoNome}
-                onChange={(e) => setNovoNome(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none"
-                placeholder="Ex: Padaria do Zé"
-              />
+          <form onSubmit={handleAdicionar} className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="w-full">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nome do Estabelecimento</label>
+                <input
+                  type="text"
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-sm"
+                  placeholder="Ex: Padaria do Zé"
+                />
+              </div>
+              
+              <div className="w-full">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Slug (Link Público)</label>
+                <input
+                  type="text"
+                  value={novoSlug}
+                  onChange={(e) => setNovoSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-sm"
+                  placeholder="Ex: padaria-do-ze"
+                />
+              </div>
+
+              <div className="w-full">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">URL da Logo (Imagem)</label>
+                <input
+                  type="text"
+                  value={novoLogoUrl}
+                  onChange={(e) => setNovoLogoUrl(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-sm"
+                  placeholder="Ex: https://linkdaimagem.com/logo.png"
+                />
+              </div>
             </div>
-            <div className="flex-1 w-full">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Slug (Link Público)</label>
-              <input
-                type="text"
-                value={novoSlug}
-                onChange={(e) => setNovoSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none"
-                placeholder="Ex: padaria-do-ze"
-              />
+
+            <div className="flex justify-end mt-2">
+              <button 
+                type="submit" 
+                className="w-full md:w-auto bg-gray-900 text-white px-8 py-2.5 rounded-lg font-bold hover:bg-gray-800 transition-colors text-sm"
+              >
+                Cadastrar Estabelecimento
+              </button>
             </div>
-            <button 
-              type="submit" 
-              className="w-full md:w-auto bg-gray-900 text-white px-8 py-2.5 rounded-lg font-bold hover:bg-gray-800 transition-colors"
-            >
-              Cadastrar
-            </button>
           </form>
         </div>
 
@@ -90,6 +113,7 @@ export default function AdminEstabelecimentos() {
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-100 border-b">
               <tr>
+                <th className="p-4 text-sm font-bold text-gray-600 uppercase w-20">Logo</th>
                 <th className="p-4 text-sm font-bold text-gray-600 uppercase">Nome</th>
                 <th className="p-4 text-sm font-bold text-gray-600 uppercase">Link (Slug)</th>
                 <th className="p-4 text-sm font-bold text-gray-600 uppercase text-center">Ações</th>
@@ -98,11 +122,24 @@ export default function AdminEstabelecimentos() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan="3" className="p-6 text-center text-gray-500">Carregando lista...</td>
+                  <td colSpan="4" className="p-6 text-center text-gray-500">Carregando lista...</td>
                 </tr>
               ) : (
                 estabelecimentos.map(est => (
                   <tr key={est.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-4">
+                      {est.logo_url ? (
+                        <img 
+                          src={est.logo_url} 
+                          alt={`Logo ${est.nome}`} 
+                          className="w-10 h-10 rounded-lg object-cover border bg-gray-50"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg border border-dashed bg-gray-50 flex items-center justify-center text-lg shadow-inner">
+                          🏪
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4 font-semibold text-gray-800">{est.nome}</td>
                     <td className="p-4 text-gray-500 text-sm">/{est.slug}</td>
                     <td className="p-4 text-center">
@@ -120,7 +157,7 @@ export default function AdminEstabelecimentos() {
               )}
               {estabelecimentos.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="3" className="p-6 text-center text-gray-500">Nenhum estabelecimento cadastrado.</td>
+                  <td colSpan="4" className="p-6 text-center text-gray-500">Nenhum estabelecimento cadastrado.</td>
                 </tr>
               )}
             </tbody>
