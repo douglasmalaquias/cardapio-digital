@@ -19,7 +19,6 @@ export default function CustomerView() {
       try {
         setLoading(true);
         
-        // 1. Busca dados do Estabelecimento
         const { data: estData, error: estError } = await supabase
           .from('estabelecimentos')
           .select('*')
@@ -30,7 +29,6 @@ export default function CustomerView() {
         setEstabelecimento(estData);
 
         if (estData) {
-          // 2. Busca Categorias Dinâmicas
           const { data: catData, error: catError } = await supabase
             .from('categorias')
             .select('*')
@@ -44,7 +42,6 @@ export default function CustomerView() {
             setCategoriaAtiva(catData[0].nome);
           }
 
-          // 3. Busca Produtos Ativos
           const { data: prodData, error: prodError } = await supabase
             .from('produtos')
             .select('*')
@@ -54,7 +51,6 @@ export default function CustomerView() {
           if (prodError) throw prodError;
           setProdutos(prodData || []);
 
-          // 4. Busca Anúncios Ativos usando as colunas em inglês do banco de dados
           const { data: adsData, error: adsError } = await supabase
             .from('anuncios')
             .select('*')
@@ -74,7 +70,6 @@ export default function CustomerView() {
     if (slug) carregarDadosIniciais();
   }, [slug]);
 
-  // Carrega opcionais ao abrir a janela flutuante de um produto
   const handleSelecionarProduto = async (produto) => {
     try {
       const { data: complementosData, error } = await supabase
@@ -94,7 +89,6 @@ export default function CustomerView() {
     }
   };
 
-  // Filtra produtos com base na aba dinâmica selecionada
   const produtosFiltrados = produtos.filter(p => p.categoria?.toLowerCase() === categoriaAtiva?.toLowerCase());
 
   if (loading) {
@@ -115,21 +109,19 @@ export default function CustomerView() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-28">
-      {/* Cabeçalho */}
+      
+      {/* Cabeçalho com Logo */}
       <header className="bg-white border-b sticky top-0 z-40 p-4 shadow-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          
-          {/* Agrupamento da Logo + Textos */}
           <div className="flex items-center gap-3">
-            {/* Se o estabelecimento tiver logo, ela aparece aqui arredondada */}
+            {/* Imagem do Logo */}
             {estabelecimento.logo_url && (
               <img 
                 src={estabelecimento.logo_url} 
-                alt={Logo ${estabelecimento.nome}} 
+                alt={`Logo ${estabelecimento.nome}`} 
                 className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover border border-gray-200 shadow-sm"
               />
             )}
-            
             <div>
               <h1 className="text-xl font-black tracking-tight text-gray-900 uppercase">
                 {estabelecimento.nome}
@@ -140,14 +132,12 @@ export default function CustomerView() {
               </p>
             </div>
           </div>
-
           <div className="bg-gray-100 px-3 py-1 rounded-full text-xs font-bold text-gray-600">
             Mesa 04
           </div>
         </div>
       </header>
 
-      {/* Carrossel de Anúncios mapeado com campos do Supabase (image e title) */}
       {anuncios.length > 0 && (
         <div className="max-w-6xl mx-auto p-4 overflow-x-auto whitespace-nowrap scrollbar-none flex gap-4">
           {anuncios.map((anuncio) => (
@@ -162,8 +152,7 @@ export default function CustomerView() {
         </div>
       )}
 
-      {/* Categorias Dinâmicas (Navegação por Abas) */}
-      <nav className="bg-white border-b sticky top-[69px] z-30 overflow-x-auto scrollbar-none">
+      <nav className="bg-white border-b sticky top-[73px] z-30 overflow-x-auto scrollbar-none">
         <div className="max-w-6xl mx-auto flex px-4 gap-2 py-3 whitespace-nowrap">
           {categorias.map((cat) => (
             <button
@@ -181,7 +170,6 @@ export default function CustomerView() {
         </div>
       </nav>
 
-      {/* Grid de Produtos da Categoria Ativa usando o Componente Oficial */}
       <main className="max-w-6xl mx-auto p-4 mt-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {produtosFiltrados.map((produto) => (
@@ -200,7 +188,6 @@ export default function CustomerView() {
         </div>
       </main>
 
-      {/* JANELA FLUTUANTE (MODAL) DE DETALHES */}
       {produtoSelecionado && (
         <ProductModal
           produto={produtoSelecionado}
