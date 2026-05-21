@@ -91,7 +91,7 @@ export default function AdminEstabelecimentos() {
 
     } catch (error) {
       alert('Erro ao criar estabelecimento: ' + error.message);
-    } final {
+    } finally {
       setUploading(false);
     }
   }
