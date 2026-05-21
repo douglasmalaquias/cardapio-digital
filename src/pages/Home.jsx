@@ -35,7 +35,11 @@ export default function Home() {
   const acessarPainelLojista = (e) => {
     e.preventDefault();
     if (!slugInput.trim()) return alert('Por favor, introduza o código/slug da sua loja!');
-    navigate(`/admin/${slugInput.trim().toLowerCase()}/produtos`);
+    
+    // Alerta temporário de feedback para o botão funcionar enquanto a página não é criada
+    alert(`Acessando o Painel de Controle da loja: ${slugInput.trim().toLowerCase()} (Interface de produtos em desenvolvimento)`);
+    // Futuramente, quando criar a página de produtos, basta reativar a linha abaixo:
+    // navigate(`/admin/${slugInput.trim().toLowerCase()}/produtos`);
   };
 
   // Enquanto verifica o banco de dados, mostra uma tela neutra
@@ -50,7 +54,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col text-gray-900">
       
-      {/* Barra Superior de Utilizador (Corrigida com z-10 para o botão funcionar) */}
+      {/* Barra Superior de Utilizador */}
       <header className="bg-white border-b p-4 shadow-xs relative z-10">
         <div className="max-w-6xl mx-auto flex justify-end">
           <button
@@ -64,7 +68,7 @@ export default function Home() {
       </header>
 
       {/* Conteúdo Principal do Hub */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 -mt-12 relative">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 -mt-12 relative z-0">
         <div className="max-w-3xl w-full text-center space-y-4 mb-12">
           <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
             Plataforma Hub Central
@@ -101,14 +105,14 @@ export default function Home() {
                   placeholder="Ex: minha-hamburgueria"
                   value={slugInput}
                   onChange={(e) => setSlugInput(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <button 
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-xs"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
               >
-                Aceder ao Painel Comercial
+                Acessar o Painel de Controle
               </button>
             </form>
           </div>
@@ -127,14 +131,16 @@ export default function Home() {
 
             <div className="pt-4 border-t space-y-2">
               <button 
-                onClick={() => navigate('/admin/minha-hamburgueria/anuncios')}
-                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-xs"
+                type="button"
+                onClick={() => alert('Interface de Gestão de Anúncios em breve!')}
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
               >
-                Gerir Campanhas de Anúncios
+                Gestão de Anúncios
               </button>
               <button 
+                type="button"
                 onClick={() => navigate('/admin/clientes')}
-                className="w-full border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm py-2.5 rounded-xl transition-all"
+                className="w-full border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm py-2.5 rounded-xl transition-all cursor-pointer"
               >
                 Painel de Clientes SaaS
               </button>
