@@ -1,21 +1,24 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import CustomerView from './pages/CustomerView';
-import AdminView from './pages/AdminView';
-import AdminAdsView from './pages/AdminAdsView';
 import AdminEstabelecimentos from './pages/AdminEstabelecimentos';
+import Login from './pages/Login'; // <-- ADICIONADO AQUI
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/:slug" element={<CustomerView />} />
-        <Route path="/admin/:slug/produtos" element={<AdminView />} />
-        <Route path="/admin/:slug/anuncios" element={<AdminAdsView />} />
-        <Route path="/admin/clientes" element={<AdminEstabelecimentos />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      {/* Rota Pública do Hub Inicial */}
+      <Route path="/" element={<Home />} />
+      
+      {/* Rota de Autenticação */}
+      <Route path="/login" element={<Login />} /> {/* <-- ADICIONADO AQUI */}
+      
+      {/* Rota de Gestão de Clientes SaaS */}
+      <Route path="/admin/clientes" element={<AdminEstabelecimentos />} />
+      
+      {/* Rota de Visualização do Cardápio Público */}
+      <Route path="/:slug" element={<CustomerView />} />
+    </Routes>
   );
 }
