@@ -50,12 +50,13 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col text-gray-900">
       
-      {/* Barra Superior de Utilizador */}
-      <header className="bg-white border-b p-4 shadow-xs">
+      {/* Barra Superior de Utilizador (Corrigida com z-10 para o botão funcionar) */}
+      <header className="bg-white border-b p-4 shadow-xs relative z-10">
         <div className="max-w-6xl mx-auto flex justify-end">
           <button
+            type="button"
             onClick={handleLogout}
-            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-1"
+            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-sm hover:shadow-md"
           >
             Sair do Sistema 🚪
           </button>
@@ -63,7 +64,7 @@ export default function Home() {
       </header>
 
       {/* Conteúdo Principal do Hub */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 -mt-12">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 -mt-12 relative">
         <div className="max-w-3xl w-full text-center space-y-4 mb-12">
           <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
             Plataforma Hub Central
