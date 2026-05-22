@@ -15,7 +15,6 @@ export default function AdminProdutos() {
 
   const [editandoId, setEditandoId] = useState(null);
 
-  // Campos do formulário manual
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -55,14 +54,11 @@ export default function AdminProdutos() {
     carregarDados();
   }, [slug, checkingAuth, navigate]);
 
-  // FUNÇÃO 1: Gerar e Baixar o Template de Planilha (.CSV compatível com Excel)
   function baixarTemplateCSV() {
-    const headers = "Nome;Preco;Categoria;Descricao;Link_Imagem\n";
-    const exemplo1 = "Burger Clássico;34,90;Burgers;Blend artesanal 150g, queijo prato e maionese da casa;https://exemplo.com/foto.jpg\n";
-    const exemplo2 = "Batata Rústica;19,00;Porcoes;Batatas fritas com alecrim e páprica;\n";
+    const headers = "Nome,Preco,Categoria,Descricao,Link_Imagem\n";
+    const exemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
     
-    // Adiciona o BOM para o Excel abrir com acentuação correta em português
-    const blob = new Blob(["\ufeff" + headers + exemplo1 + exemplo2], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\ufeff" + headers + exemplo1], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -72,7 +68,7 @@ export default function AdminProdutos() {
     document.body.removeChild(link);
   }
 
-  // FUNÇÃO 2: Processar e Cadastrar a Planilha Enviada
+  // FUNÇÃO ATUALIZADA: Motor robusto para ler o CSV gerado pelo Excel
   async function handleImportarCSV(e) {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
@@ -88,26 +84,44 @@ export default function AdminProdutos() {
       
       leitor.onload = async (evento) => {
         const texto = evento.target.result;
-        // Divide as linhas contornando quebras de sistema operacionais diferentes
         const linhas = texto.split(/\r?\n/); 
         
-        // Remove o cabeçalho (primeira linha)
+        // PARSER INTELIGENTE: Lê vírgulas ou ponto-e-vírgula e respeita aspas
+        const parseLinhaCSV = (linhaStr) => {
+          let resultado = [];
+          let valorAtual = '';
+          let dentroDeAspas = false;
+          
+          for (let i = 0; i < linhaStr.length; i++) {
+            let char = linhaStr[i];
+            if (char === '"') {
+              dentroDeAspas = !dentroDeAspas;
+            } else if ((char === ',' || char === ';') && !dentroDeAspas) {
+              resultado.push(valorAtual.trim());
+              valorAtual = '';
+            } else {
+              valorAtual += char;
+            }
+          }
+          resultado.push(valorAtual.trim());
+          return resultado;
+        };
+
         const linhasDeDados = linhas.slice(1);
         const produtosParaInserir = [];
 
         for (let linha of linhasDeDados) {
-          if (!linha.trim()) continue; // Ignora linhas vazias
+          if (!linha.trim()) continue; 
           
-          const colunas = linha.split(';');
-          if (colunas.length < 2 || !colunas[0]) continue; // Validação básica de segurança
+          const colunas = parseLinhaCSV(linha);
+          if (colunas.length < 2 || !colunas[0]) continue; 
 
-          const csvNome = colunas[0].trim();
-          // Tratamento de infra do preço: remove R$, espaços e troca vírgula por ponto para o banco aceitar como float
-          const precoLimpo = colunas[1].replace('R$', '').replace(/\s/g, '').replace(',', '.').trim();
+          const csvNome = colunas[0];
+          const precoLimpo = colunas[1] ? colunas[1].replace('R$', '').replace(/\s/g, '').replace(',', '.').trim() : '0';
           const csvPreco = parseFloat(precoLimpo) || 0;
-          const csvCategoria = colunas[2] ? colunas[2].trim() : (categorias[0]?.nome || 'Geral');
-          const csvDescricao = colunas[3] ? colunas[3].trim() : null;
-          const csvImageUrl = colunas[4] ? colunas[4].trim() : null;
+          const csvCategoria = colunas[2] || (categorias[0]?.nome || 'Geral');
+          const csvDescricao = colunas[3] || null;
+          const csvImageUrl = colunas[4] || null;
 
           produtosParaInserir.push({
             estabelecimento_id: estabelecimento.id,
@@ -125,13 +139,11 @@ export default function AdminProdutos() {
           return;
         }
 
-        // Envio em lote (Batch Insert) de alta performance
         const { error } = await supabase.from('produtos').insert(produtosParaInserir);
         if (error) throw error;
 
         alert(`${produtosParaInserir.length} produtos cadastrados em massa com sucesso!`);
         
-        // Recarrega a tabela de visualização
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
       };
@@ -141,7 +153,7 @@ export default function AdminProdutos() {
       alert("Erro na importação: " + err.message);
     } finally {
       setUploading(false);
-      e.target.value = ''; // Limpa o campo de arquivo
+      e.target.value = '';
     }
   }
 
@@ -239,12 +251,11 @@ export default function AdminProdutos() {
         </div>
       </div>
 
-      {/* NOVO DASHBOARD DE IMPORTE EM MASSA */}
       <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
         <div>
           <h2 className="font-bold text-gray-900 text-base">Onboarding: Importação Rápida via Planilha</h2>
           <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-            Baixe o modelo estruturado, peça para o novo cliente preencher os produtos e faça o upload do arquivo pronto. O sistema processará o cardápio instantaneamente.
+            Baixe o modelo estruturado, preencha os produtos e faça o upload do arquivo. O sistema processará o cardápio instantaneamente.
           </p>
           <button 
             onClick={baixarTemplateCSV} 
@@ -265,7 +276,6 @@ export default function AdminProdutos() {
         </div>
       </div>
 
-      {/* FORMULÁRIO MANUAL / EDIÇÃO DE COMPLEMENTOS */}
       <form onSubmit={handleSalvarProduto} className="space-y-4 bg-white p-6 rounded-3xl shadow-sm border mb-8">
         <h2 className="text-sm font-bold text-gray-700 uppercase mb-2">
           {editandoId ? '✏️ Ajustar / Editar Detalhes do Produto' : '➕ Cadastrar Produto Avulso'}
@@ -304,7 +314,6 @@ export default function AdminProdutos() {
         </div>
       </form>
 
-      {/* TABELA DE VISUALIZAÇÃO */}
       <div className="bg-white rounded-3xl border overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b">
