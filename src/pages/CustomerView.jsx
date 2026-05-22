@@ -40,14 +40,12 @@ export default function CustomerView() {
     carregarCardapio();
   }, [slug]);
 
-  // Efeito para o Timer do Carrossel Automático (Troca a cada 4 segundos)
+  // Timer do Carrossel (Troca a cada 5 segundos para dar tempo de ver a foto inteira)
   useEffect(() => {
     if (anuncios.length <= 1) return;
-
     const interval = setInterval(() => {
       setCurrentBanner((prev) => (prev + 1) % anuncios.length);
-    }, 4000);
-
+    }, 5000); // 5 segundos
     return () => clearInterval(interval);
   }, [anuncios]);
 
@@ -57,7 +55,7 @@ export default function CustomerView() {
   const produtosFiltrados = categoriaAtiva === 'Todos' ? produtos : produtos.filter(p => p.categoria === categoriaAtiva);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16 font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50 pb-16 font-sans text-gray-900 relative">
       
       {/* HEADER */}
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-40 shadow-xs">
@@ -71,11 +69,10 @@ export default function CustomerView() {
         </div>
       </header>
 
-      {/* CARROSSEL AUTOMÁTICO RE-CALIBRADO PARA TABLETS */}
+      {/* CARROSSEL DE ANÚNCIOS: EXIBIÇÃO DA IMAGEM INTEIRA COM FUNDO BLUR */}
       {anuncios.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 pt-4">
-          {/* Trocamos 'aspect-video' por alturas fixas controladas para não achatar nem empurrar o layout */}
-          <div className="relative h-44 sm:h-52 md:h-56 w-full rounded-3xl overflow-hidden shadow-xs border bg-gray-100">
+          <div className="relative h-44 sm:h-52 md:h-64 w-full rounded-3xl overflow-hidden shadow-xs border bg-black group">
             
             {/* Wrapper dos Banners */}
             <div className="w-full h-full relative">
@@ -86,12 +83,15 @@ export default function CustomerView() {
                     index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
                 >
-                  {/* Imagem preenchendo a faixa sem distorcer */}
-                  <img src={ad.image} alt={ad.title} className="w-full h-full object-cover object-center" />
+                  {/* CAMADA DE FUNDO (A mágica do Blur): Pega a imagem, distorce e borra para preencher as laterais vazias */}
+                  <img src={ad.image} alt="" className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-50 scale-110" />
+
+                  {/* CAMADA PRINCIPAL (A foto da fachada INTEIRA): object-contain garante que nada seja cortado */}
+                  <img src={ad.image} alt={ad.title} className="relative z-10 w-full h-full object-contain object-center animate-fade-in" />
                   
                   {/* Gradiente Escuro e Título Centralizado */}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-6 text-center">
-                    <h2 className="text-white font-black text-lg md:text-2xl uppercase tracking-wide drop-shadow-md max-w-xl leading-tight">
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-6 text-center z-20">
+                    <h2 className="text-white font-black text-base md:text-2xl uppercase tracking-wide drop-shadow-lg max-w-xl leading-tight">
                       {ad.title}
                     </h2>
                   </div>
@@ -101,15 +101,14 @@ export default function CustomerView() {
 
             {/* Indicadores (Dots) */}
             {anuncios.length > 1 && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20 bg-black/20 backdrop-blur-xs px-3 py-1.5 rounded-full">
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-30 bg-black/30 backdrop-blur-xs px-3 py-1.5 rounded-full">
                 {anuncios.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setCurrentBanner(idx)}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      idx === currentBanner ? 'bg-white w-5' : 'bg-white/50'
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                      idx === currentBanner ? 'bg-white w-4' : 'bg-white/50'
                     }`}
-                    aria-label={`Ir para o slide ${idx + 1}`}
                   />
                 ))}
               </div>
@@ -145,14 +144,15 @@ export default function CustomerView() {
           {produtosFiltrados.map(prod => (
             <div key={prod.id} className="bg-white border p-5 rounded-3xl flex flex-col justify-between shadow-xs">
               <div className="flex flex-col space-y-4">
-                <div className="w-full h-44 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
+                {/* Janela da foto do card preenchida proporcionalmente */}
+                <div className="w-full h-48 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
                   {prod.image_url ? (
                     <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
                   ) : (
                     <div className="text-4xl opacity-40">🍔</div>
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-black text-gray-900 uppercase text-base">{prod.nome}</h3>
                   <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">{prod.descricao || 'Sem descrição.'}</p>
                 </div>
@@ -168,26 +168,32 @@ export default function CustomerView() {
         </div>
       </main>
 
-      {/* MODAL DETALHES */}
+      {/* MODAL DETALHES COMPLETO COM IMAGEM INTEIRA E FUNDO BLUR */}
       {produtoModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col animate-zoom-in">
             <button 
               onClick={() => setProdutoModal(null)} 
-              className="absolute top-4 right-4 bg-white/80 hover:bg-white w-8 h-8 rounded-full flex items-center justify-center font-black z-10 shadow-sm"
+              className="absolute top-4 right-4 bg-white/80 hover:bg-white w-8 h-8 rounded-full flex items-center justify-center font-black z-30 shadow-sm"
             >
               ✕
             </button>
             
-            <div className="w-full h-64 bg-gray-100 flex items-center justify-center border-b shrink-0">
+            {/* Janela do modal com Fundo Blur e Imagem Inteira */}
+            <div className="w-full h-64 bg-black flex items-center justify-center border-b shrink-0 relative overflow-hidden">
               {produtoModal.image_url ? (
-                <img src={produtoModal.image_url} alt={produtoModal.nome} className="w-full h-full object-cover object-center" />
+                <>
+                  {/* Fundo Blur */}
+                  <img src={produtoModal.image_url} alt="" className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-50 scale-110 z-0" />
+                  {/* Imagem Inteira (contain) */}
+                  <img src={produtoModal.image_url} alt={produtoModal.nome} className="relative z-10 w-full h-full object-contain object-center" />
+                </>
               ) : (
-                <div className="text-6xl opacity-30">🍔</div>
+                <div className="text-6xl opacity-30 text-white">🍔</div>
               )}
             </div>
 
-            <div className="p-6">
+            <div className="p-6 relative z-10">
               <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
                 {produtoModal.categoria}
               </span>
