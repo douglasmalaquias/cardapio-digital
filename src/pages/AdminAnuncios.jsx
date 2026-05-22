@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 export default function AdminAnuncios() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  
+
   const [estabelecimento, setEstabelecimento] = useState(null);
   const [anuncios, setAnuncios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,25 +13,27 @@ export default function AdminAnuncios() {
   const [uploading, setUploading] = useState(false);
 
   // Campos do formulário
-  const [titulo, setTitulo] = useState('');
+  const [title, setTitle] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imagemArquivo, setImagemArquivo] = useState(null);
 
+  // 1. Verificar Sessão (Segurança)
   useEffect(() => {
-    async function verificarSessao() {
-      const { data: { user } } = await supabase.auth.getUser();
+    supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) navigate('/login');
       else setCheckingAuth(false);
-    }
-    verificarSessao();
+    });
   }, [navigate]);
 
+  // 2. Carregar Dados do Estabelecimento e Anúncios Existentes
   useEffect(() => {
     if (checkingAuth) return;
 
     async function carregarDados() {
       try {
         setLoading(true);
+        
+        // Busca o estabelecimento para pegar o ID correto (Evita quebra de Foreign Key)
         const { data: estData, error: estError } = await supabase
           .from('estabelecimentos')
           .select('*')
@@ -45,6 +47,7 @@ export default function AdminAnuncios() {
         }
         setEstabelecimento(estData);
 
+        // Busca os anúncios vinculados a este ID
         const { data: adsData } = await supabase
           .from('anuncios')
           .select('*')
@@ -52,7 +55,7 @@ export default function AdminAnuncios() {
 
         setAnuncios(adsData || []);
       } catch (err) {
-        console.error(err);
+        console.error('Erro ao carregar anúncios:', err);
       } finally {
         setLoading(false);
       }
@@ -60,18 +63,21 @@ export default function AdminAnuncios() {
     carregarDados();
   }, [slug, checkingAuth, navigate]);
 
-  async function handleCampanha(e) {
+  // 3. Cadastrar Novo Anúncio
+  async function handleCadastrarAnuncio(e) {
     e.preventDefault();
-    if (!titulo) return alert('Insira um título interno!');
-    if (!imageUrl && !imagemArquivo) return alert('Selecione uma imagem ou insira uma URL!');
+    if (!title) return alert('O título do anúncio é obrigatório!');
+    if (!imagemArquivo && !imageUrl) return alert('Insira uma imagem por upload ou link URL!');
+    if (!estabelecimento?.id) return alert('Erro de infraestrutura: ID do estabelecimento não carregado.');
 
     try {
       setUploading(true);
       let finalImageUrl = imageUrl;
 
+      // Se houver arquivo de imagem local selecionado
       if (imagemArquivo) {
         const fileExt = imagemArquivo.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `anuncios/${estabelecimento.id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
@@ -84,23 +90,29 @@ export default function AdminAnuncios() {
         finalImageUrl = data.publicUrl;
       }
 
-      const { error } = await supabase.from('anuncios').insert([
+      // INSERT garantindo que o estabelecimento_id correto está sendo injetado
+      const { error: insertError } = await supabase.from('anuncios').insert([
         {
-          estabelecimento_id: estabelecimento.id,
-          title: titulo,
+          estabelecimento_id: estabelecimento.id, // Chave estrangeira obrigatória
+          title: title,
           image: finalImageUrl,
           active: true
         }
       ]);
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      alert('Banner de anúncio adicionado!');
-      setTitulo('');
+      alert('Anúncio cadastrado com sucesso!');
+      
+      // Reseta o formulário
+      setTitle('');
       setImageUrl('');
       setImagemArquivo(null);
-      document.getElementById('fileInputAd').value = '';
-      
+      if (document.getElementById('fileInput')) {
+        document.getElementById('fileInput').value = '';
+      }
+
+      // Recarrega a listagem atualizada
       const { data: adsData } = await supabase
         .from('anuncios')
         .select('*')
@@ -108,110 +120,109 @@ export default function AdminAnuncios() {
       setAnuncios(adsData || []);
 
     } catch (error) {
-      alert('Erro ao processar anúncio: ' + error.message);
+      alert('Erro ao salvar anúncio: ' + error.message);
     } finally {
       setUploading(false);
     }
   }
 
-  async function handleApagar(id) {
-    if (!window.confirm('Tem certeza que deseja apagar este banner?')) return;
-    
-    const { error } = await supabase.from('anuncios').delete().eq('id', id);
-    if (error) {
-      alert('Erro ao apagar: ' + error.message);
-    } else {
-      setAnuncios(anuncios.filter(a => a.id !== id));
+  // 4. Excluir Anúncio
+  async function handleExcluirAnuncio(id) {
+    if (!window.confirm('Deseja realmente excluir este banner de anúncio?')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('anuncios').delete().eq('id', id);
+      if (error) throw error;
+      
+      setAnuncios(anuncios.filter(ad => ad.id !== id));
+      alert('Anúncio removido!');
+    } catch (err) {
+      alert('Erro ao excluir: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
-  if (checkingAuth || loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500">Carregando painel de anúncios...</div>;
-  }
+  if (checkingAuth || loading) return <div className="p-6 font-medium text-gray-500">Sincronizando painel de anúncios...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl mx-auto">
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div>
-            <button type="button" onClick={() => navigate('/')} className="text-sm text-gray-500 font-bold hover:underline mb-1 block cursor-pointer">
-              ← Voltar ao Hub Central
-            </button>
-            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
-              Gestão de Anúncios - {estabelecimento.nome}
-            </h1>
-          </div>
-          <a href={`/${slug}`} target="_blank" rel="noreferrer" className="bg-gray-900 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-xs hover:bg-gray-800 transition-all">
-            Ver Telão ↗
-          </a>
-        </div>
-
-        {/* Form de Cadastro */}
-        <div className="bg-white p-6 rounded-3xl shadow-xs border mb-8">
-          <form onSubmit={handleCampanha} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título (Interno)</label>
-              <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ex: Promoção Hamburguer de Quinta" />
-            </div>
-
-            {/* BOX DUPLO IMAGEM BANNER */}
-            <div className="bg-gray-50 p-4 rounded-2xl border border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção A: Upload de Banner Local</label>
-                <input 
-                  id="fileInputAd"
-                  type="file" 
-                  accept="image/*"
-                  onChange={(e) => {
-                    setImagemArquivo(e.target.files[0]);
-                    setImageUrl('');
-                  }}
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-900 file:text-white hover:file:bg-gray-800 cursor-pointer"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Opção B: Link do Banner (URL)</label>
-                <input 
-                  type="text" 
-                  value={imageUrl} 
-                  disabled={!!imagemArquivo}
-                  onChange={(e) => setImageUrl(e.target.value)} 
-                  className="w-full border rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-gray-900 disabled:opacity-40" 
-                  placeholder="https://site.com/banner.jpg" 
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button type="submit" disabled={uploading} className="w-full md:w-auto bg-amber-500 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-600 transition-colors disabled:opacity-50 cursor-pointer">
-                {uploading ? 'Fazendo Upload...' : 'Adicionar Banner'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Lista de Banners */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {anuncios.map(anuncio => (
-            <div key={anuncio.id} className="bg-white border rounded-2xl overflow-hidden shadow-sm relative group">
-              <img src={anuncio.image} alt={anuncio.title} className="w-full h-48 object-cover" />
-              <div className="p-4 flex justify-between items-center">
-                <span className="font-bold text-gray-800">{anuncio.title}</span>
-                <button onClick={() => handleApagar(anuncio.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors cursor-pointer">
-                  Apagar
-                </button>
-              </div>
-            </div>
-          ))}
-          {anuncios.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-400 bg-white border rounded-2xl border-dashed">
-              Nenhum banner ativo no momento.
-            </div>
-          )}
-        </div>
-
+    <div className="p-6 max-w-5xl mx-auto font-sans text-gray-900">
+      
+      <div className="mb-6">
+        <button onClick={() => navigate('/')} className="text-sm text-amber-600 font-bold hover:underline mb-1">
+          ← Voltar ao Hub
+        </button>
+        <h1 className="text-2xl font-black">Gestão de Banners / Anúncios - {estabelecimento.nome}</h1>
       </div>
+
+      {/* FORMULÁRIO */}
+      <form onSubmit={handleCadastrarAnuncio} className="space-y-4 bg-white p-6 rounded-3xl shadow-sm border mb-8">
+        <h2 className="text-sm font-bold text-amber-600 uppercase mb-2">🚀 Criar Novo Banner de Destaque</h2>
+        
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Título / Nome do Banner</label>
+          <input 
+            type="text" 
+            placeholder="Ex: Combo de Inauguração - 20% OFF" 
+            value={title} 
+            onChange={(e) => setTitle(e.target.value)} 
+            className="w-full border border-gray-300 p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white" 
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-dashed">
+          <div>
+            <label className="block text-xs font-bold mb-1 uppercase text-gray-600">Opção A: Upload de Foto Local</label>
+            <input 
+              id="fileInput" 
+              type="file" 
+              accept="image/*" 
+              onChange={(e) => { setImagemArquivo(e.target.files[0] || null); setImageUrl(''); }} 
+              className="text-sm cursor-pointer mt-1" 
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold mb-1 uppercase text-gray-600">Opção B: Link de Imagem (URL)</label>
+            <input 
+              type="text" 
+              value={imageUrl} 
+              disabled={!!imagemArquivo} 
+              onChange={(e) => setImageUrl(e.target.value)} 
+              className="w-full border border-gray-300 p-2.5 rounded-xl outline-none bg-white disabled:opacity-40 mt-1" 
+              placeholder="https://..." 
+            />
+          </div>
+        </div>
+
+        <button type="submit" disabled={uploading} className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-xl font-bold transition-colors cursor-pointer">
+          {uploading ? 'Enviando banner...' : 'Publicar Anúncio'}
+        </button>
+      </form>
+
+      {/* LISTA DE ANÚNCIOS ATIVOS */}
+      <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Banners Ativos no Cardápio</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {anuncios.map(ad => (
+          <div key={ad.id} className="bg-white border rounded-3xl p-4 flex gap-4 items-center shadow-sm justify-between">
+            <div className="flex items-center gap-4 min-w-0">
+              <img src={ad.image} alt={ad.title} className="w-20 h-14 rounded-xl object-cover border" />
+              <div className="font-bold text-gray-900 truncate pr-2">{ad.title}</div>
+            </div>
+            <button 
+              onClick={() => handleExcluirAnuncio(ad.id)} 
+              className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors shrink-0"
+            >
+              Remover
+            </button>
+          </div>
+        ))}
+        {anuncios.length === 0 && (
+          <div className="col-span-full text-center py-8 text-gray-400 bg-white border border-dashed rounded-3xl text-sm font-medium">
+            Nenhum banner ativo no momento.
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
