@@ -15,7 +15,6 @@ export default function AdminProdutos() {
 
   const [editandoId, setEditandoId] = useState(null);
 
-  // Campos do formulário
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -23,7 +22,6 @@ export default function AdminProdutos() {
   const [imagemArquivo, setImagemArquivo] = useState(null);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
 
-  // ESTADO DE SELEÇÃO EM MASSA
   const [selecionados, setSelecionados] = useState([]);
 
   useEffect(() => {
@@ -83,7 +81,7 @@ export default function AdminProdutos() {
 
     setUploading(true);
 
-    const processarPlanilha = async (texto, fileInputEvent) => {
+    const processarPlanilha = async (texto) => {
       try {
         const linhas = texto.split(/\r?\n/); 
         
@@ -93,7 +91,7 @@ export default function AdminProdutos() {
           let dentroDeAspas = false;
           
           for (let i = 0; i < linhaStr.length; i++) {
-            let char = inlineStr = linhaStr[i];
+            let char = linhaStr[i];
             if (char === '"') {
               dentroDeAspas = !dentroDeAspas;
             } else if ((char === ',' || char === ';') && !dentroDeAspas) {
@@ -107,7 +105,7 @@ export default function AdminProdutos() {
           return resultado;
         };
 
-        const linhasDeDados = lines = linhas.slice(1);
+        const linhasDeDados = linhas.slice(1);
         const produtosParaInserir = [];
 
         for (let linha of linhasDeDados) {
@@ -143,44 +141,45 @@ export default function AdminProdutos() {
         if (error) throw error;
 
         alert(`${produtosParaInserir.length} produtos cadastrados em massa com sucesso!`);
-        setSelecionados([]); // Reseta seleção
+        setSelecionados([]); 
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
       } catch (err) {
         alert("Erro na importação: " + err.message);
       } finally {
         setUploading(false);
-        fileInputEvent.target.value = '';
+        // Limpeza cravada via ID para evitar bugs do React com FileReader
+        const csvInput = document.getElementById('csvInput');
+        if (csvInput) csvInput.value = '';
       }
     };
 
     const leitorUTF8 = new FileReader();
     leitorUTF8.onload = (evento) => {
       const texto = evento.target.result;
-      if (texto.includes('')) {
+      // \uFFFD é o código nativo do caractere de erro de acentuação ()
+      if (texto.includes('\uFFFD')) {
         const leitorANSI = new FileReader();
         leitorANSI.onload = (eventoANSI) => {
-          processarPlanilha(eventoANSI.target.result, e);
+          processarPlanilha(eventoANSI.target.result);
         };
         leitorANSI.readAsText(arquivo, 'windows-1252');
       } else {
-        processarPlanilha(texto, e);
+        processarPlanilha(texto);
       }
     };
     leitorUTF8.readAsText(arquivo, 'UTF-8');
   }
 
-  // LOGICA DO SELECIONAR TODOS
   function handleSelecionarTodos() {
     if (selecionados.length === produtos.length) {
-      setSelecionados([]); // Desmarca tudo
+      setSelecionados([]); 
     } else {
       const todosIds = produtos.map(p => p.id);
-      setSelecionados(todosIds); // Marca tudo
+      setSelecionados(todosIds); 
     }
   }
 
-  // LOGICA DA SELEÇÃO INDIVIDUAL
   function handleSelecionarItem(id) {
     if (selecionados.includes(id)) {
       setSelecionados(selecionados.filter(item => item !== id));
@@ -189,24 +188,18 @@ export default function AdminProdutos() {
     }
   }
 
-  // EXCLUSÃO EM MASSA (BULK DELETE) VIA OPERADOR .IN()
   async function handleExcluirEmMassa() {
     if (!window.confirm(`Tem certeza absoluta de que deseja excluir os ${selecionados.length} produtos selecionados de uma só vez?`)) return;
 
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('produtos')
-        .delete()
-        .in('id', selecionados); // Disparo em lote de alta performance
+      const { error } = await supabase.from('produtos').delete().in('id', selecionados); 
 
       if (error) throw error;
 
       alert(`${selecionados.length} produtos removidos com sucesso!`);
-      
-      // Atualiza o estado local filtrando o que foi apagado
       setProdutos(produtos.filter(p => !selecionados.includes(p.id)));
-      setSelecionados([]); // Limpa as caixas de seleção
+      setSelecionados([]); 
     } catch (err) {
       alert("Erro ao excluir em lote: " + err.message);
     } finally {
@@ -278,7 +271,7 @@ export default function AdminProdutos() {
       if (editandoId) {
         const { error: updateError } = await supabase.from('produtos').update(dadosProduto).eq('id', editandoId);
         if (updateError) throw updateError;
-        alert('Produto updated!');
+        alert('Produto atualizado!');
       } else {
         const { error: insertError } = await supabase.from('produtos').insert([dadosProduto]);
         if (insertError) throw insertError;
@@ -308,7 +301,6 @@ export default function AdminProdutos() {
           <h1 className="text-2xl font-black">Gestão Administrativa - {estabelecimento.nome}</h1>
         </div>
         
-        {/* BOTÃO FLUTUANTE DE EXCLUSÃO EM MASSA DINÂMICO */}
         {selecionados.length > 0 && (
           <button 
             onClick={handleExcluirEmMassa}
@@ -319,7 +311,6 @@ export default function AdminProdutos() {
         )}
       </div>
 
-      {/* DASHBOARD DE IMPORTAÇÃO */}
       <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
         <div>
           <h2 className="font-bold text-gray-900 text-base">Onboarding: Importação Rápida via Planilha</h2>
@@ -336,6 +327,7 @@ export default function AdminProdutos() {
         <div className="bg-white p-4 rounded-2xl border border-dashed border-amber-300 flex flex-col items-center justify-center text-center">
           <label className="text-xs font-black text-gray-700 uppercase mb-2 block">Selecionar Planilha Preenchida</label>
           <input 
+            id="csvInput"
             type="file" 
             accept=".csv" 
             onChange={handleImportarCSV} 
@@ -345,7 +337,6 @@ export default function AdminProdutos() {
         </div>
       </div>
 
-      {/* FORMULÁRIO */}
       <form onSubmit={handleSalvarProduto} className="space-y-4 bg-white p-6 rounded-3xl shadow-sm border mb-8">
         <h2 className="text-sm font-bold text-gray-700 uppercase mb-2">
           {editandoId ? '✏️ Ajustar / Editar Detalhes do Produto' : '➕ Cadastrar Produto Avulso'}
@@ -384,7 +375,6 @@ export default function AdminProdutos() {
         </div>
       </form>
 
-      {/* TABELA DE VISUALIZAÇÃO COM CHECKBOXES DE MASSA */}
       <div className="bg-white rounded-3xl border overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b">
