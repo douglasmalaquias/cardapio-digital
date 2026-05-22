@@ -15,7 +15,7 @@ export default function AdminProdutos() {
   const [editandoId, setEditandoId] = useState(null);
   const [selecionados, setSelecionados] = useState([]);
 
-  // Campos do formulário manual
+  // Campos do formulário manual (Todos restaurados)
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -52,8 +52,8 @@ export default function AdminProdutos() {
 
   function baixarTemplateCSV() {
     const headers = "Nome,Preco,Categoria,Descricao,Link_Imagem\n";
-    const exemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
-    const blob = new Blob(["\ufeff" + headers + exemplo1], { type: 'text/csv;charset=utf-8;' });
+    const ejemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
+    const blob = new Blob(["\ufeff" + headers + ejemplo1], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -61,18 +61,18 @@ export default function AdminProdutos() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
+  // MOTOR DE IMPORTAÇÃO BLINDADO: Identifica e cria categorias no banco para aparecerem no cardápio
   async function handleImportarCSV(e) {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
-    if (!window.confirm("Importar produtos e criar categorias automaticamente?")) { e.target.value = ''; return; }
+    if (!window.confirm("Deseja importar os produtos e criar automaticamente as novas categorias para o cardápio?")) { e.target.value = ''; return; }
 
     setUploading(true);
     const processarPlanilha = async (texto) => {
       try {
-        const linhas = texto.split(/\r?\n/).slice(1);
-        const produtosParaInserir = [];
+        const linhas = texto.split(/\r?\n/);
         
-        // Carrega o estado atual de categorias para um Map
+        // Carrega o estado mais fresco de categorias do banco de dados
         const { data: catsAtuais } = await supabase.from('categorias').select('*').eq('estabelecimento_id', estabelecimento.id);
         const catsMap = new Map((catsAtuais || []).map(c => [c.nome.toLowerCase(), c.id]));
 
@@ -88,45 +88,54 @@ export default function AdminProdutos() {
           return resultado;
         };
 
-        for (let linha of linhas) {
+        const linhasDeDados = linhas.slice(1);
+        const produtosParaInserir = [];
+
+        for (let linha of linhasDeDados) {
           if (!linha.trim()) continue;
           const colunas = parseLinhaCSV(linha);
           if (colunas.length < 2 || !colunas[0]) continue;
 
-          const nomeCat = colunas[2] || 'Geral';
+          const nomeCat = colunas[2] ? colunas[2].trim() : 'Geral';
           let catId = catsMap.get(nomeCat.toLowerCase());
           
-          // Se a categoria não existir na memória local, cria no banco e atualiza a memória
+          // Se a categoria vinda da planilha não existir na tabela 'categorias', cria ela agora
           if (!catId) {
-            const { data: novaCat } = await supabase.from('categorias').insert([{ nome: nomeCat, estabelecimento_id: estabelecimento.id }]).select().single();
+            const { data: novaCat, error: errCat } = await supabase
+              .from('categorias')
+              .insert([{ nome: nomeCat, estabelecimento_id: estabelecimento.id }])
+              .select()
+              .single();
+            
+            if (errCat) throw errCat;
             catId = novaCat.id;
-            catsMap.set(nomeCat.toLowerCase(), catId);
+            catsMap.set(nomeCat.toLowerCase(), catId); // Salva na memória do laço
           }
 
           produtosParaInserir.push({
             estabelecimento_id: estabelecimento.id,
             nome: colunas[0],
             preco: parseFloat(colunas[1].replace('R$', '').replace(/\s/g, '').replace(',', '.')) || 0,
-            categoria: nomeCat,
+            categoria: nomeCat, // Vincula o nome exato para a filtragem do cardápio
             descricao: colunas[3] || null,
             image_url: colunas[4] || null,
             ativo: true
           });
         }
 
-        // Insere todos os produtos de uma vez só
+        // Envia os produtos em lote
         await supabase.from('produtos').insert(produtosParaInserir);
 
-        alert("Importação concluída com sucesso!");
+        alert("Cardápio importado e categorias estruturadas com sucesso!");
 
-        // FORÇA ATUALIZAÇÃO SÍNCRONA: Atualiza categorias e produtos juntos na tela
+        // Sincroniza o painel com os novos dados do banco de dados imediatamente
         const { data: novasCategorias } = await supabase.from('categorias').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setCategorias(novasCategorias || []);
         if (novasCategorias && novasCategorias.length > 0) setCategoriaSelecionada(novasCategorias[0].nome);
 
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
-      } catch (err) { alert("Erro ao importar: " + err.message); } finally { setUploading(false); document.getElementById('csvInput').value = ''; }
+      } catch (err) { alert("Erro ao processar lote: " + err.message); } finally { setUploading(false); document.getElementById('csvInput').value = ''; }
     };
 
     const leitorUTF8 = new FileReader();
@@ -141,6 +150,7 @@ export default function AdminProdutos() {
     leitorUTF8.readAsText(arquivo, 'UTF-8');
   }
 
+  // --- Funções de Persistência Manual ---
   async function handleSalvarProduto(e) {
     e.preventDefault();
     if (!nome || !preco) return alert('Nome e Preço são obrigatórios!');
@@ -176,37 +186,53 @@ export default function AdminProdutos() {
   function resetarFormulario() { 
     setEditandoId(null); setNome(''); setPreco(''); setDescricao(''); setImageUrl(''); setImagemArquivo(null); 
     if (document.getElementById('fileInput')) document.getElementById('fileInput').value = '';
+    if (categorias.length > 0) setCategoriaSelecionada(categorias[0].nome);
   }
   
   function handleEditarClick(p) { 
     setEditandoId(p.id); setNome(p.nome); setPreco(p.preco); setDescricao(p.descricao || ''); setImageUrl(p.image_url || ''); setCategoriaSelecionada(p.categoria); 
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   
   async function handleExcluirClick(id) { 
-    if (window.confirm('Deseja excluir este produto?')) { await supabase.from('produtos').delete().eq('id', id); setProdutos(produtos.filter(p => p.id !== id)); } 
+    if (window.confirm('Deseja excluir este produto?')) { 
+      await supabase.from('produtos').delete().eq('id', id); 
+      setProdutos(produtos.filter(p => p.id !== id)); 
+      setSelecionados(selecionados.filter(item => item !== id));
+    } 
   }
   
   async function handleExcluirEmMassa() { 
-    if (window.confirm('Deseja excluir todos os produtos selecionados?')) { await supabase.from('produtos').delete().in('id', selecionados); setProdutos(produtos.filter(p => !selecionados.includes(p.id))); setSelecionados([]); } 
+    if (window.confirm(`Deseja realmente excluir os ${selecionados.length} produtos selecionados?`)) { 
+      await supabase.from('produtos').delete().in('id', selecionados); 
+      setProdutos(produtos.filter(p => !selecionados.includes(p.id))); 
+      setSelecionados([]); 
+    } 
   }
 
   if (checkingAuth || loading) return <div className="p-6 font-medium text-gray-500">Sincronizando painel administrador...</div>;
 
   return (
     <div className="p-6 max-w-5xl mx-auto font-sans text-gray-900">
+      
+      {/* CABEÇALHO */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <button onClick={() => navigate('/')} className="text-sm text-amber-600 font-bold hover:underline mb-1">← Voltar ao Hub</button>
           <h1 className="text-2xl font-black">Gestão Administrativa - {estabelecimento?.nome}</h1>
         </div>
-        {selecionados.length > 0 && <button onClick={handleExcluirEmMassa} className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-md">🗑️ Excluir Selecionados ({selecionados.length})</button>}
+        {selecionados.length > 0 && (
+          <button onClick={handleExcluirEmMassa} className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-md">
+            🗑️ Excluir Selecionados ({selecionados.length})
+          </button>
+        )}
       </div>
 
-      {/* COMPONENTE DE IMPORTAÇÃO */}
+      {/* DASHBOARD DE IMPORTAÇÃO */}
       <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
         <div>
           <h2 className="font-bold text-gray-900 text-base">Onboarding: Importação Rápida via Planilha</h2>
-          <p className="text-xs text-gray-600 mt-1 leading-relaxed">Baixe o modelo estruturado, preencha os produtos e faça o upload do arquivo. O sistema processará as categorias e o cardápio instantaneamente.</p>
+          <p className="text-xs text-gray-600 mt-1 leading-relaxed">Baixe o modelo estruturado, preencha os produtos e faça o upload do arquivo. As novas categorias e os itens serão criados de forma totalmente automatizada para o cardápio.</p>
           <button onClick={baixarTemplateCSV} className="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">📥 Baixar Modelo de Planilha (CSV)</button>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-dashed border-amber-300 flex flex-col items-center justify-center text-center">
@@ -246,12 +272,19 @@ export default function AdminProdutos() {
         </div>
       </form>
 
-      {/* TABELA DE PRODUTOS */}
+      {/* TABELA DE PRODUTOS COMPLETA COM COLUNAS RESTAURADAS */}
       <div className="bg-white rounded-3xl border overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="p-4 w-12 text-center"><input type="checkbox" checked={produtos.length > 0 && selecionados.length === produtos.length} onChange={() => setSelecionados(selecionados.length === produtos.length ? [] : produtos.map(p=>p.id))} className="w-4 h-4 cursor-pointer accent-amber-500 rounded" /></th>
+              <th className="p-4 w-12 text-center">
+                <input 
+                  type="checkbox" 
+                  checked={produtos.length > 0 && selecionados.length === produtos.length} 
+                  onChange={() => setSelecionados(selecionados.length === produtos.length ? [] : produtos.map(p=>p.id))} 
+                  className="w-4 h-4 cursor-pointer accent-amber-500 rounded" 
+                />
+              </th>
               <th className="p-4 text-xs font-bold text-gray-500 uppercase w-24">Foto</th>
               <th className="p-4 text-xs font-bold text-gray-500 uppercase">Produto</th>
               <th className="p-4 text-xs font-bold text-gray-500 uppercase">Categoria</th>
@@ -262,9 +295,23 @@ export default function AdminProdutos() {
           <tbody className="divide-y divide-gray-100">
             {produtos.map(prod => (
               <tr key={prod.id} className={`hover:bg-gray-50 transition-colors ${selecionados.includes(prod.id) ? 'bg-amber-50/40' : ''}`}>
-                <td className="p-4 text-center"><input type="checkbox" checked={selecionados.includes(prod.id)} onChange={() => setSelecionados(selecionados.includes(prod.id) ? selecionados.filter(id=>id!==prod.id) : [...selecionados, prod.id])} className="w-4 h-4 cursor-pointer accent-amber-500 rounded" /></td>
-                <td className="p-4"><div className="w-12 h-12 rounded-xl overflow-hidden border bg-gray-50">{prod.image_url ? <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">🍔</div>}</div></td>
-                <td className="p-4"><div className="font-bold text-gray-900">{prod.nome}</div><div className="text-xs text-gray-400 line-clamp-1">{prod.descricao || 'Sem descrição.'}</div></td>
+                <td className="p-4 text-center">
+                  <input 
+                    type="checkbox" 
+                    checked={selecionados.includes(prod.id)} 
+                    onChange={() => setSelecionados(selecionados.includes(prod.id) ? selecionados.filter(id=>id!==prod.id) : [...selecionados, prod.id])} 
+                    className="w-4 h-4 cursor-pointer accent-amber-500 rounded" 
+                  />
+                </td>
+                <td className="p-4">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border bg-gray-50">
+                    {prod.image_url ? <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">🍔</div>}
+                  </div>
+                </td>
+                <td className="p-4">
+                  <div className="font-bold text-gray-900">{prod.nome}</div>
+                  <div className="text-xs text-gray-400 line-clamp-1">{prod.descricao || 'Sem descrição ou info nutricional.'}</div>
+                </td>
                 <td className="p-4 text-sm text-gray-500 font-medium">{prod.categoria}</td>
                 <td className="p-4 font-black text-amber-600">R$ {prod.preco.toFixed(2)}</td>
                 <td className="p-4 text-right space-x-2">
@@ -273,6 +320,11 @@ export default function AdminProdutos() {
                 </td>
               </tr>
             ))}
+            {produtos.length === 0 && (
+              <tr>
+                <td colSpan="6" className="p-8 text-center text-gray-400 font-medium text-sm">Nenhum produto importado até o momento.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
