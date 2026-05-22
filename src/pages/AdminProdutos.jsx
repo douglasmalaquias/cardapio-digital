@@ -17,6 +17,7 @@ export default function AdminProdutos() {
   
   const [abaAtiva, setAbaAtiva] = useState('produtos');
 
+  // Campos do formulário manual de Produtos
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -24,6 +25,7 @@ export default function AdminProdutos() {
   const [imagemArquivo, setImagemArquivo] = useState(null);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
 
+  // Campos de Configuração da Loja
   const [lojaNome, setLojaNome] = useState('');
   const [lojaLogoUrl, setLojaLogoUrl] = useState('');
   const [lojaLogoArquivo, setLojaLogoArquivo] = useState(null);
@@ -71,7 +73,7 @@ export default function AdminProdutos() {
   function baixarTemplateCSV() {
     const headers = "Nome,Preco,Categoria,Descricao,Link_Imagem\n";
     const exemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
-    const blob = new Blob(["\ufeff" + headers + exemplo1], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\ufeff" + headers + ejemplo1], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -79,7 +81,6 @@ export default function AdminProdutos() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
-  // NOVA FUNÇÃO: Exporta o cardápio real atual com as URLs das imagens do Storage
   function handleExportarCardapioAtual() {
     if (produtos.length === 0) return alert('Não há produtos para exportar.');
     
@@ -128,7 +129,7 @@ export default function AdminProdutos() {
         const linhasDeDados = linhas.slice(1);
         const produtosParaInserir = [];
 
-        for (let linha of linhasDeDados) {
+        for (let inline da linha of linhasDeDados) {
           if (!linha.trim()) continue;
           const colunas = parseLinhaCSV(linha);
           if (colunas.length < 2 || !colunas[0]) continue;
@@ -136,8 +137,14 @@ export default function AdminProdutos() {
           const nomeCat = colunas[2] ? colunas[2].trim() : 'Geral';
           let catId = catsMap.get(nomeCat.toLowerCase());
           
+          // CORREÇÃO: estabelecimento_id mapeado corretamente em português
           if (!catId) {
-            const { data: novaCat, error: errCat } = await supabase.from('categorias').insert([{ nome: nomeCat, estabelecimento_id: estabelecimento.id }]).select().single();
+            const { data: novaCat, error: errCat } = await supabase
+              .from('categorias')
+              .insert([{ nome: nomeCat, estabelecimento_id: estabelecimento.id }])
+              .select()
+              .single();
+            
             if (errCat) throw errCat;
             catId = novaCat.id;
             catsMap.set(nomeCat.toLowerCase(), catId); 
@@ -155,7 +162,7 @@ export default function AdminProdutos() {
         }
 
         await supabase.from('produtos').insert(produtosParaInserir);
-        alert("Cardápio importado com sucesso!");
+        alert("Cardápio e categorias importados com sucesso!");
 
         const { data: novasCategorias } = await supabase.from('categorias').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setCategorias(novasCategorias || []);
@@ -163,7 +170,7 @@ export default function AdminProdutos() {
 
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
-      } catch (err) { alert("Erro: " + err.message); } finally { setUploading(false); document.getElementById('csvInput').value = ''; }
+      } catch (err) { alert("Erro: " + err.message); } finally { setUploading(false); if (document.getElementById('csvInput')) document.getElementById('csvInput').value = ''; }
     };
 
     const leitorUTF8 = new FileReader();
@@ -324,7 +331,7 @@ export default function AdminProdutos() {
               <div><label className="block text-xs font-bold mb-1">URL da Foto</label><input type="text" value={imageUrl} disabled={!!imagemArquivo} onChange={(e) => setImageUrl(e.target.value)} className="w-full border p-2 rounded-xl bg-white" /></div>
             </div>
             <div className="flex gap-3 pt-2">
-              <button type="submit" className="bg-black text-white px-6 py-3 rounded-xl font-bold">{editandoId ? 'Atualizar Dados' : 'Salvar Produto'}</button>
+              <button type="submit" className="bg-black text-white px-6 py-3 rounded-xl font-bold transition-colors">{editandoId ? 'Atualizar Dados' : 'Salvar Produto'}</button>
               {editandoId && <button type="button" onClick={resetarFormulario} className="bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold">Cancelar</button>}
             </div>
           </form>
