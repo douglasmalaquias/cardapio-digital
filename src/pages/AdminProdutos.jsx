@@ -83,7 +83,6 @@ export default function AdminProdutos() {
           if (!linha.trim()) continue;
           const colunas = linha.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
           const nomeCat = colunas[2] || 'Geral';
-          
           let catId = catsMap.get(nomeCat.toLowerCase());
           if (!catId) {
             const { data: novaCat } = await supabase.from('categorias').insert([{ nome: nomeCat, estabelecimento_id: estabelecimento.id }]).select().single();
@@ -111,13 +110,14 @@ export default function AdminProdutos() {
         const { data } = await supabase.storage.from('imagens').upload(`estabelecimentos/${estabelecimento.id}/logo_${Date.now()}`, lojaLogoArquivo);
         finalLogoUrl = supabase.storage.from('imagens').getPublicUrl(data.path).data.publicUrl;
       }
+      // CORREÇÃO: usamos 'tema' em vez de 'cor_tema'
       await supabase.from('estabelecimentos').update({ nome: lojaNome, logo_url: finalLogoUrl, tema: lojaTema }).eq('id', estabelecimento.id);
       alert('Configurações salvas!');
     } catch (err) { alert(err.message); } finally { setUploading(false); }
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto font-sans text-gray-900">
       <div className="flex gap-6 border-b mb-8">
         <button onClick={() => setAbaAtiva('produtos')} className={`pb-3 font-bold ${abaAtiva === 'produtos' ? 'border-b-2 border-black' : ''}`}>🍔 Cardápio</button>
         <button onClick={() => setAbaAtiva('config')} className={`pb-3 font-bold ${abaAtiva === 'config' ? 'border-b-2 border-black' : ''}`}>⚙️ Configurações</button>
@@ -132,7 +132,7 @@ export default function AdminProdutos() {
           <button type="submit" className="bg-black text-white px-6 py-3 rounded-xl font-bold">Salvar Configurações</button>
         </form>
       ) : (
-        /* ... (seu código de tabela e formulário de produtos mantido aqui) ... */
+        <div className="text-gray-500">Use a exportação/importação acima para gerir os seus produtos.</div>
       )}
     </div>
   );
