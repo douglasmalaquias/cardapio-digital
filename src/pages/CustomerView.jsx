@@ -44,7 +44,8 @@ export default function CustomerView() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16 font-sans text-gray-900">
-      {/* HEADER SEM MESA 04 */}
+      
+      {/* HEADER */}
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-40 shadow-xs">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           {estabelecimento.logo_url ? (
@@ -56,20 +57,23 @@ export default function CustomerView() {
         </div>
       </header>
 
-      {/* BANNER / ANÚNCIOS */}
+      {/* BANNER / ANÚNCIOS (Proporção 16:9 Cinema travada para não quebrar o layout) */}
       {anuncios.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 pt-6">
           <div className="flex gap-4 overflow-x-auto snap-x scrollbar-none pb-2">
             {anuncios.map(ad => (
-              <div key={ad.id} className="w-full shrink-0 snap-center relative h-44 rounded-2xl overflow-hidden shadow-xs">
-                <img src={ad.image} alt={ad.title} className="w-full h-full object-cover" />
+              <div key={ad.id} className="w-full shrink-0 snap-center relative aspect-video md:h-64 rounded-3xl overflow-hidden shadow-xs border bg-gray-100">
+                <img src={ad.image} alt={ad.title} className="w-full h-full object-cover object-center" />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                  <span className="text-white font-black text-sm uppercase tracking-wider">{ad.title}</span>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* NAVEGAÇÃO DE CATEGORIAS */}
+      {/* CATEGORIAS */}
       <nav className="max-w-5xl mx-auto px-4 pt-6 sticky top-[73px] z-30 bg-gray-50/90 backdrop-blur-md py-2">
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
           <button 
@@ -90,25 +94,26 @@ export default function CustomerView() {
         </div>
       </nav>
 
-      {/* LISTA DE PRODUTOS CORRIGIDA (IMAGE_URL) */}
+      {/* LISTA DE PRODUTOS */}
       <main className="max-w-5xl mx-auto px-4 pt-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {produtosFiltrados.map(prod => (
             <div key={prod.id} className="bg-white border p-5 rounded-3xl flex flex-col justify-between shadow-xs">
               <div className="flex flex-col space-y-4">
-                <div className="w-full h-48 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border">
+                {/* Janela da foto do card: proporção e tamanho idênticos sempre */}
+                <div className="w-full h-48 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
                   {prod.image_url ? (
-                    <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover" />
+                    <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
                   ) : (
                     <div className="text-4xl opacity-40">🍔</div>
                   )}
                 </div>
                 <div>
-                  <h3 className="font-black text-gray-900 uppercase">{prod.nome}</h3>
-                  <p className="text-xs text-gray-400 mt-1 line-clamp-2">{prod.descricao || 'Sem descrição.'}</p>
+                  <h3 className="font-black text-gray-900 uppercase text-base">{prod.nome}</h3>
+                  <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">{prod.descricao || 'Sem descrição.'}</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-4 mt-4 border-t">
+              <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-50">
                 <div className="font-black text-amber-500 text-base">R$ {prod.preco.toFixed(2)}</div>
                 <button onClick={() => setProdutoModal(prod)} className="bg-amber-500 text-white font-black text-xs px-5 py-2.5 rounded-xl uppercase hover:bg-amber-600 transition-colors">
                   Detalhes
@@ -119,9 +124,9 @@ export default function CustomerView() {
         </div>
       </main>
 
-      {/* MODAL DETALHES COMPLETO COM IMAGEM CORRIGIDA */}
+      {/* MODAL DETALHES */}
       {produtoModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col">
             <button 
               onClick={() => setProdutoModal(null)} 
@@ -130,10 +135,10 @@ export default function CustomerView() {
               ✕
             </button>
             
-            {/* Imagem no topo do Modal */}
-            <div className="w-full h-56 bg-gray-100 flex items-center justify-center border-b">
+            {/* Foto do modal preenchendo 100% da caixa superior */}
+            <div className="w-full h-64 bg-gray-100 flex items-center justify-center border-b shrink-0">
               {produtoModal.image_url ? (
-                <img src={produtoModal.image_url} alt={produtoModal.nome} className="w-full h-full object-cover" />
+                <img src={produtoModal.image_url} alt={produtoModal.nome} className="w-full h-full object-cover object-center" />
               ) : (
                 <div className="text-6xl opacity-30">🍔</div>
               )}

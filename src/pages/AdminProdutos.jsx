@@ -13,10 +13,8 @@ export default function AdminProdutos() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // Controle de Edição
   const [editandoId, setEditandoId] = useState(null);
 
-  // Campos do formulário
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -102,7 +100,6 @@ export default function AdminProdutos() {
       setUploading(true);
       let finalImageUrl = imageUrl;
 
-      // Upload corrigido preservando a extensão do arquivo (.png, .jpg, etc)
       if (imagemArquivo) {
         const fileExt = imagemArquivo.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
@@ -159,7 +156,6 @@ export default function AdminProdutos() {
         </div>
       </div>
 
-      {/* FORMULÁRIO */}
       <form onSubmit={handleSalvarProduto} className="space-y-4 bg-white p-6 rounded-3xl shadow-sm border mb-8">
         <h2 className="text-sm font-bold text-amber-600 uppercase mb-4">
           {editandoId ? '✏️ Editando Produto' : '➕ Cadastrar Novo Produto'}
@@ -198,7 +194,6 @@ export default function AdminProdutos() {
         </div>
       </form>
 
-      {/* TABELA COM COLUNA DE FOTO RE-ADICIONADA */}
       <div className="bg-white rounded-3xl border overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b">
@@ -214,11 +209,14 @@ export default function AdminProdutos() {
             {produtos.map(prod => (
               <tr key={prod.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-4">
-                  {prod.image_url ? (
-                    <img src={prod.image_url} alt={prod.nome} className="w-12 h-12 rounded-xl object-cover border shadow-2xs" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl border border-dashed bg-gray-50 flex items-center justify-center text-xl">🍔</div>
-                  )}
+                  {/* Miniatura quadrada travada perfeita */}
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border shrink-0 bg-gray-50">
+                    {prod.image_url ? (
+                      <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xl">🍔</div>
+                    )}
+                  </div>
                 </td>
                 <td className="p-4">
                   <div className="font-bold text-gray-900">{prod.nome}</div>
