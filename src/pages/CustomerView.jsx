@@ -12,6 +12,9 @@ export default function CustomerView() {
   const [loading, setLoading] = useState(true);
   const [produtoModal, setProdutoModal] = useState(null);
 
+  // Estado para controlar o banner ativo no carrossel
+  const [currentBanner, setCurrentBanner] = useState(0);
+
   useEffect(() => {
     async function carregarCardapio() {
       try {
@@ -37,6 +40,17 @@ export default function CustomerView() {
     carregarCardapio();
   }, [slug]);
 
+  // Efeito para o Timer do Carrossel Automático (Troca a cada 4 segundos)
+  useEffect(() => {
+    if (anuncios.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentBanner((prev) => (prev + 1) % anuncios.length);
+    }, 4000); // 4000ms = 4 segundos
+
+    return () => clearInterval(interval);
+  }, [anuncios]);
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center font-medium text-gray-500">Carregando cardápio...</div>;
   if (!estabelecimento) return <div className="min-h-screen bg-gray-50 flex items-center justify-center font-medium text-gray-500">Estabelecimento não encontrado.</div>;
 
@@ -57,18 +71,48 @@ export default function CustomerView() {
         </div>
       </header>
 
-      {/* BANNER / ANÚNCIOS (Proporção 16:9 Cinema travada para não quebrar o layout) */}
+      {/* NOVO CARROSSEL AUTOMÁTICO DE ANÚNCIOS */}
       {anuncios.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 pt-6">
-          <div className="flex gap-4 overflow-x-auto snap-x scrollbar-none pb-2">
-            {anuncios.map(ad => (
-              <div key={ad.id} className="w-full shrink-0 snap-center relative aspect-video md:h-64 rounded-3xl overflow-hidden shadow-xs border bg-gray-100">
-                <img src={ad.image} alt={ad.title} className="w-full h-full object-cover object-center" />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                  <span className="text-white font-black text-sm uppercase tracking-wider">{ad.title}</span>
+          <div className="relative aspect-video md:h-64 rounded-3xl overflow-hidden shadow-xs border bg-gray-100 group">
+            
+            {/* Wrapper dos Banners */}
+            <div className="w-full h-full relative">
+              {anuncios.map((ad, index) => (
+                <div
+                  key={ad.id}
+                  className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
+                    index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                  }`}
+                >
+                  {/* Imagem do Banner */}
+                  <img src={ad.image} alt={ad.title} className="w-full h-full object-cover object-center" />
+                  
+                  {/* Gradiente Escuro e Título Totalmente Centralizado */}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-6 text-center">
+                    <h2 className="text-white font-black text-xl md:text-3xl uppercase tracking-wide drop-shadow-md max-w-lg leading-tight animate-fade-in">
+                      {ad.title}
+                    </h2>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Indicadores de Bolinha (Dots Navigation) - Só aparecem se houver mais de 1 anúncio */}
+            {anuncios.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20 bg-black/20 backdrop-blur-xs px-3 py-1.5 rounded-full">
+                {anuncios.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentBanner(idx)}
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      idx === currentBanner ? 'bg-white w-5' : 'bg-white/50'
+                    }`}
+                    aria-label={`Ir para o slide ${idx + 1}`}
+                  />
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -100,7 +144,6 @@ export default function CustomerView() {
           {produtosFiltrados.map(prod => (
             <div key={prod.id} className="bg-white border p-5 rounded-3xl flex flex-col justify-between shadow-xs">
               <div className="flex flex-col space-y-4">
-                {/* Janela da foto do card: proporção e tamanho idênticos sempre */}
                 <div className="w-full h-48 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
                   {prod.image_url ? (
                     <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
@@ -135,7 +178,6 @@ export default function CustomerView() {
               ✕
             </button>
             
-            {/* Foto do modal preenchendo 100% da caixa superior */}
             <div className="w-full h-64 bg-gray-100 flex items-center justify-center border-b shrink-0">
               {produtoModal.image_url ? (
                 <img src={produtoModal.image_url} alt={produtoModal.nome} className="w-full h-full object-cover object-center" />
