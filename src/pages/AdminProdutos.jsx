@@ -12,17 +12,16 @@ export default function AdminProdutos() {
   const [loading, setLoading] = useState(true);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [uploading, setUploading] = useState(false);
-
   const [editandoId, setEditandoId] = useState(null);
+  const [selecionados, setSelecionados] = useState([]);
 
+  // Campos do formulário
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imagemArquivo, setImagemArquivo] = useState(null);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
-
-  const [selecionados, setSelecionados] = useState([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -33,7 +32,6 @@ export default function AdminProdutos() {
 
   useEffect(() => {
     if (checkingAuth) return;
-
     async function carregarDados() {
       try {
         setLoading(true);
@@ -47,11 +45,7 @@ export default function AdminProdutos() {
 
         const { data: prodData } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estData.id).order('nome');
         setProdutos(prodData || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     }
     carregarDados();
   }, [slug, checkingAuth, navigate]);
@@ -59,382 +53,149 @@ export default function AdminProdutos() {
   function baixarTemplateCSV() {
     const headers = "Nome,Preco,Categoria,Descricao,Link_Imagem\n";
     const exemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
-    
     const blob = new Blob(["\ufeff" + headers + exemplo1], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", `template_produtos_${slug}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
   async function handleImportarCSV(e) {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
-
-    if (!window.confirm("Deseja importar os produtos desta planilha?")) {
-      e.target.value = '';
-      return;
-    }
+    if (!window.confirm("Importar produtos e criar categorias automaticamente?")) { e.target.value = ''; return; }
 
     setUploading(true);
-
     const processarPlanilha = async (texto) => {
       try {
-        const linhas = texto.split(/\r?\n/); 
-        
+        const linhas = texto.split(/\r?\n/).slice(1);
+        const produtosParaInserir = [];
+        const catsMap = new Map(categorias.map(c => [c.nome.toLowerCase(), c.id]));
+
         const parseLinhaCSV = (linhaStr) => {
-          let resultado = [];
-          let valorAtual = '';
-          let dentroDeAspas = false;
-          
+          let resultado = [], valorAtual = '', dentroDeAspas = false;
           for (let i = 0; i < linhaStr.length; i++) {
             let char = linhaStr[i];
-            if (char === '"') {
-              dentroDeAspas = !dentroDeAspas;
-            } else if ((char === ',' || char === ';') && !dentroDeAspas) {
-              resultado.push(valorAtual.trim());
-              valorAtual = '';
-            } else {
-              valorAtual += char;
-            }
+            if (char === '"') dentroDeAspas = !dentroDeAspas;
+            else if ((char === ',' || char === ';') && !dentroDeAspas) { resultado.push(valorAtual.trim()); valorAtual = ''; }
+            else valorAtual += char;
           }
           resultado.push(valorAtual.trim());
           return resultado;
         };
 
-        const linhasDeDados = linhas.slice(1);
-        const produtosParaInserir = [];
-
-        for (let linha of linhasDeDados) {
-          if (!linha.trim()) continue; 
-          
+        for (let linha of linhas) {
+          if (!linha.trim()) continue;
           const colunas = parseLinhaCSV(linha);
-          if (colunas.length < 2 || !colunas[0]) continue; 
+          if (colunas.length < 2 || !colunas[0]) continue;
 
-          const csvNome = colunas[0];
-          const precoLimpo = colunas[1] ? colunas[1].replace('R$', '').replace(/\s/g, '').replace(',', '.').trim() : '0';
-          const csvPreco = parseFloat(precoLimpo) || 0;
-          const csvCategoria = colunas[2] || (categorias[0]?.nome || 'Geral');
-          const csvDescricao = colunas[3] || null;
-          const csvImageUrl = colunas[4] || null;
+          const nomeCat = colunas[2] || 'Geral';
+          let catId = catsMap.get(nomeCat.toLowerCase());
+          
+          if (!catId) {
+            const { data: novaCat } = await supabase.from('categorias').insert([{ nome: nomeCat, estabelecimento_id: estabelecimento.id }]).select().single();
+            catId = novaCat.id;
+            catsMap.set(nomeCat.toLowerCase(), catId);
+            setCategorias(prev => [...prev, novaCat]);
+          }
 
           produtosParaInserir.push({
             estabelecimento_id: estabelecimento.id,
-            nome: csvNome,
-            preco: csvPreco,
-            categoria: csvCategoria,
-            descricao: csvDescricao,
-            image_url: csvImageUrl,
+            nome: colunas[0],
+            preco: parseFloat(colunas[1].replace(',', '.')) || 0,
+            categoria: nomeCat,
+            descricao: colunas[3] || null,
+            image_url: colunas[4] || null,
             ativo: true
           });
         }
-
-        if (produtosParaInserir.length === 0) {
-          alert("Nenhum produto válido encontrado na planilha.");
-          return;
-        }
-
-        const { error } = await supabase.from('produtos').insert(produtosParaInserir);
-        if (error) throw error;
-
-        alert(`${produtosParaInserir.length} produtos cadastrados em massa com sucesso!`);
-        setSelecionados([]); 
+        await supabase.from('produtos').insert(produtosParaInserir);
+        alert("Importação concluída!");
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
-      } catch (err) {
-        alert("Erro na importação: " + err.message);
-      } finally {
-        setUploading(false);
-        // Limpeza cravada via ID para evitar bugs do React com FileReader
-        const csvInput = document.getElementById('csvInput');
-        if (csvInput) csvInput.value = '';
-      }
+      } catch (err) { alert("Erro: " + err.message); } finally { setUploading(false); document.getElementById('csvInput').value = ''; }
     };
 
     const leitorUTF8 = new FileReader();
-    leitorUTF8.onload = (evento) => {
-      const texto = evento.target.result;
-      // \uFFFD é o código nativo do caractere de erro de acentuação ()
+    leitorUTF8.onload = (ev) => {
+      const texto = ev.target.result;
       if (texto.includes('\uFFFD')) {
         const leitorANSI = new FileReader();
-        leitorANSI.onload = (eventoANSI) => {
-          processarPlanilha(eventoANSI.target.result);
-        };
+        leitorANSI.onload = (e) => processarPlanilha(e.target.result);
         leitorANSI.readAsText(arquivo, 'windows-1252');
-      } else {
-        processarPlanilha(texto);
-      }
+      } else processarPlanilha(texto);
     };
     leitorUTF8.readAsText(arquivo, 'UTF-8');
   }
 
-  function handleSelecionarTodos() {
-    if (selecionados.length === produtos.length) {
-      setSelecionados([]); 
-    } else {
-      const todosIds = produtos.map(p => p.id);
-      setSelecionados(todosIds); 
-    }
-  }
-
-  function handleSelecionarItem(id) {
-    if (selecionados.includes(id)) {
-      setSelecionados(selecionados.filter(item => item !== id));
-    } else {
-      setSelecionados([...selecionados, id]);
-    }
-  }
-
-  async function handleExcluirEmMassa() {
-    if (!window.confirm(`Tem certeza absoluta de que deseja excluir os ${selecionados.length} produtos selecionados de uma só vez?`)) return;
-
-    try {
-      setLoading(true);
-      const { error } = await supabase.from('produtos').delete().in('id', selecionados); 
-
-      if (error) throw error;
-
-      alert(`${selecionados.length} produtos removidos com sucesso!`);
-      setProdutos(produtos.filter(p => !selecionados.includes(p.id)));
-      setSelecionados([]); 
-    } catch (err) {
-      alert("Erro ao excluir em lote: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function resetarFormulario() {
-    setEditandoId(null);
-    setNome(''); setPreco(''); setDescricao(''); setImageUrl(''); setImagemArquivo(null);
-    if (document.getElementById('fileInput')) document.getElementById('fileInput').value = '';
-    if (categorias.length > 0) setCategoriaSelecionada(categorias[0].nome);
-  }
-
-  function handleEditarClick(produto) {
-    setEditandoId(produto.id);
-    setNome(produto.nome);
-    setPreco(produto.preco);
-    setDescricao(produto.descricao || '');
-    setImageUrl(produto.image_url || '');
-    setCategoriaSelecionada(produto.categoria);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  async function handleExcluirClick(id) {
-    if (!window.confirm('Deseja realmente excluir este produto?')) return;
-    try {
-      setLoading(true);
-      const { error } = await supabase.from('produtos').delete().eq('id', id);
-      if (error) throw error;
-      setProdutos(produtos.filter(p => p.id !== id));
-      setSelecionados(selecionados.filter(item => item !== id));
-      alert('Produto excluído!');
-    } catch (err) {
-      alert('Erro ao excluir: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  // --- Funções de Gestão ---
   async function handleSalvarProduto(e) {
     e.preventDefault();
-    if (!nome || !preco) return alert('Nome e Preço são obrigatórios!');
-
     try {
       setUploading(true);
       let finalImageUrl = imageUrl;
-
       if (imagemArquivo) {
-        const fileExt = imagemArquivo.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `produtos/${estabelecimento.id}/${fileName}`;
-        const { error: uploadError } = await supabase.storage.from('imagens').upload(filePath, imagemArquivo);
-        if (uploadError) throw uploadError;
-        const { data } = supabase.storage.from('imagens').getPublicUrl(filePath);
-        finalImageUrl = data.publicUrl;
+        const filePath = `produtos/${estabelecimento.id}/${Date.now()}.${imagemArquivo.name.split('.').pop()}`;
+        const { error: upErr } = await supabase.storage.from('imagens').upload(filePath, imagemArquivo);
+        if (upErr) throw upErr;
+        finalImageUrl = supabase.storage.from('imagens').getPublicUrl(filePath).data.publicUrl;
       }
-
-      const dadosProduto = {
-        estabelecimento_id: estabelecimento.id,
-        nome,
-        preco: parseFloat(preco),
-        descricao: descricao || null,
-        image_url: finalImageUrl || null,
-        categoria: categoriaSelecionada,
-        ativo: true
-      };
-
-      if (editandoId) {
-        const { error: updateError } = await supabase.from('produtos').update(dadosProduto).eq('id', editandoId);
-        if (updateError) throw updateError;
-        alert('Produto atualizado!');
-      } else {
-        const { error: insertError } = await supabase.from('produtos').insert([dadosProduto]);
-        if (insertError) throw insertError;
-        alert('Produto cadastrado!');
-      }
-
+      const data = { estabelecimento_id: estabelecimento.id, nome, preco: parseFloat(preco), descricao, image_url: finalImageUrl, categoria: categoriaSelecionada, ativo: true };
+      if (editandoId) await supabase.from('produtos').update(data).eq('id', editandoId);
+      else await supabase.from('produtos').insert([data]);
       resetarFormulario();
       const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
       setProdutos(prods || []);
-    } catch (err) {
-      alert('Erro ao salvar: ' + err.message);
-    } finally {
-      setUploading(false);
-    }
+    } catch (err) { alert(err.message); } finally { setUploading(false); }
   }
 
-  if (checkingAuth || loading) return <div className="p-6 font-medium text-gray-500">Sincronizando painel administrador...</div>;
+  function resetarFormulario() { setEditandoId(null); setNome(''); setPreco(''); setDescricao(''); setImageUrl(''); setImagemArquivo(null); }
+  function handleEditarClick(p) { setEditandoId(p.id); setNome(p.nome); setPreco(p.preco); setDescricao(p.descricao); setImageUrl(p.image_url); setCategoriaSelecionada(p.categoria); }
+  async function handleExcluirClick(id) { if (window.confirm('Excluir?')) { await supabase.from('produtos').delete().eq('id', id); setProdutos(produtos.filter(p => p.id !== id)); } }
+  async function handleExcluirEmMassa() { if (window.confirm('Excluir selecionados?')) { await supabase.from('produtos').delete().in('id', selecionados); setProdutos(produtos.filter(p => !selecionados.includes(p.id))); setSelecionados([]); } }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto font-sans text-gray-900">
-      
+    <div className="p-6 max-w-5xl mx-auto font-sans">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <button onClick={() => navigate('/')} className="text-sm text-amber-600 font-bold hover:underline mb-1">
-            ← Voltar ao Hub
-          </button>
-          <h1 className="text-2xl font-black">Gestão Administrativa - {estabelecimento.nome}</h1>
-        </div>
-        
-        {selecionados.length > 0 && (
-          <button 
-            onClick={handleExcluirEmMassa}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-md animate-fade-in cursor-pointer"
-          >
-            🗑️ Excluir Selecionados ({selecionados.length})
-          </button>
-        )}
+        <h1 className="text-2xl font-black">Gestão - {estabelecimento?.nome}</h1>
+        {selecionados.length > 0 && <button onClick={handleExcluirEmMassa} className="bg-red-600 text-white px-5 py-3 rounded-xl font-bold">🗑️ Excluir ({selecionados.length})</button>}
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-        <div>
-          <h2 className="font-bold text-gray-900 text-base">Onboarding: Importação Rápida via Planilha</h2>
-          <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-            Baixe o modelo estruturado, preencha os produtos e faça o upload do arquivo. O sistema processará o cardápio instantaneamente.
-          </p>
-          <button 
-            onClick={baixarTemplateCSV} 
-            className="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer"
-          >
-            📥 Baixar Modelo de Planilha (CSV)
-          </button>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-dashed border-amber-300 flex flex-col items-center justify-center text-center">
-          <label className="text-xs font-black text-gray-700 uppercase mb-2 block">Selecionar Planilha Preenchida</label>
-          <input 
-            id="csvInput"
-            type="file" 
-            accept=".csv" 
-            onChange={handleImportarCSV} 
-            disabled={uploading}
-            className="text-xs cursor-pointer file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" 
-          />
-        </div>
+      <div className="bg-amber-50 p-6 rounded-3xl mb-6 border border-amber-200">
+        <button onClick={baixarTemplateCSV} className="bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold mb-4">📥 Baixar Modelo</button>
+        <input id="csvInput" type="file" accept=".csv" onChange={handleImportarCSV} className="block text-xs" />
       </div>
 
-      <form onSubmit={handleSalvarProduto} className="space-y-4 bg-white p-6 rounded-3xl shadow-sm border mb-8">
-        <h2 className="text-sm font-bold text-gray-700 uppercase mb-2">
-          {editandoId ? '✏️ Ajustar / Editar Detalhes do Produto' : '➕ Cadastrar Produto Avulso'}
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" placeholder="Nome do Produto" value={nome} onChange={(e) => setNome(e.target.value)} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white" />
-          <input type="number" step="0.01" placeholder="Preço" value={preco} onChange={(e) => setPreco(e.target.value)} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white" />
-          <select value={categoriaSelecionada} onChange={(e) => setCategoriaSelecionada(e.target.value)} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white">
-            {categorias.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-          </select>
-        </div>
-        
-        <input type="text" placeholder="Descrição completa (ingredientes, info nutricional, porção...)" value={descricao} onChange={(e) => setDescricao(e.target.value)} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white" />
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-dashed">
-          <div>
-            <label className="block text-xs font-bold mb-1">Vincular Foto Local</label>
-            <input id="fileInput" type="file" accept="image/*" onChange={(e) => { setImagemArquivo(e.target.files[0] || null); setImageUrl(''); }} className="text-sm cursor-pointer" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold mb-1">Vincular Foto por URL Externa</label>
-            <input type="text" value={imageUrl} disabled={!!imagemArquivo} onChange={(e) => setImageUrl(e.target.value)} className="w-full border p-2 rounded-xl outline-none bg-white disabled:opacity-40" placeholder="https://..." />
-          </div>
-        </div>
-        
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={uploading} className="bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-bold transition-colors">
-            {uploading ? 'Salvando...' : (editandoId ? 'Atualizar Dados' : 'Salvar Produto')}
-          </button>
-          {editandoId && (
-            <button type="button" onClick={resetarFormulario} className="bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold">
-              Cancelar
-            </button>
-          )}
-        </div>
+      <form onSubmit={handleSalvarProduto} className="bg-white p-6 rounded-3xl border mb-8 space-y-4">
+        <input type="text" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} className="w-full border p-3 rounded-xl" />
+        <input type="number" step="0.01" placeholder="Preço" value={preco} onChange={(e) => setPreco(e.target.value)} className="w-full border p-3 rounded-xl" />
+        <button type="submit" className="bg-black text-white px-6 py-3 rounded-xl font-bold">{editandoId ? 'Atualizar' : 'Salvar'}</button>
       </form>
 
-      <div className="bg-white rounded-3xl border overflow-hidden shadow-sm">
-        <table className="w-full text-left">
+      <div className="bg-white rounded-3xl border overflow-hidden">
+        <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="p-4 w-12 text-center">
-                <input 
-                  type="checkbox" 
-                  checked={produtos.length > 0 && selecionados.length === produtos.length} 
-                  onChange={handleSelecionarTodos}
-                  className="w-4 h-4 cursor-pointer accent-amber-500 rounded" 
-                />
-              </th>
-              <th className="p-4 text-xs font-bold text-gray-500 uppercase w-24">Foto</th>
-              <th className="p-4 text-xs font-bold text-gray-500 uppercase">Produto</th>
-              <th className="p-4 text-xs font-bold text-gray-500 uppercase">Categoria</th>
-              <th className="p-4 text-xs font-bold text-gray-500 uppercase">Preço</th>
-              <th className="p-4 text-xs font-bold text-gray-500 uppercase text-right">Ações</th>
+              <th className="p-4 text-center"><input type="checkbox" onChange={(e) => setSelecionados(e.target.checked ? produtos.map(p=>p.id) : [])} /></th>
+              <th className="p-4 text-xs uppercase">Produto</th>
+              <th className="p-4 text-xs uppercase">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {produtos.map(prod => (
-              <tr key={prod.id} className={`hover:bg-gray-50 transition-colors ${selecionados.includes(prod.id) ? 'bg-amber-50/40' : ''}`}>
-                <td className="p-4 text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={selecionados.includes(prod.id)} 
-                    onChange={() => handleSelecionarItem(prod.id)}
-                    className="w-4 h-4 cursor-pointer accent-amber-500 rounded" 
-                  />
-                </td>
-                <td className="p-4">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden border shrink-0 bg-gray-50">
-                    {prod.image_url ? (
-                      <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl">🍔</div>
-                    )}
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="font-bold text-gray-900">{prod.nome}</div>
-                  <div className="text-xs text-gray-400 line-clamp-1">{prod.descricao || 'Sem descrição ou info nutricional.'}</div>
-                </td>
-                <td className="p-4 text-sm text-gray-500 font-medium">{prod.categoria}</td>
-                <td className="p-4 font-black text-amber-600">R$ {prod.preco.toFixed(2)}</td>
-                <td className="p-4 text-right space-x-2">
-                  <button onClick={() => handleEditarClick(prod)} className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100">Editar / Foto</button>
-                  <button onClick={() => handleExcluirClick(prod.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100">Excluir</button>
+          <tbody>
+            {produtos.map(p => (
+              <tr key={p.id}>
+                <td className="p-4 text-center"><input type="checkbox" checked={selecionados.includes(p.id)} onChange={() => setSelecionados(selecionados.includes(p.id) ? selecionados.filter(id=>id!==p.id) : [...selecionados, p.id])} /></td>
+                <td className="p-4 font-bold">{p.nome}</td>
+                <td className="p-4 space-x-2">
+                  <button onClick={() => handleEditarClick(p)} className="text-blue-600 font-bold text-xs">Editar</button>
+                  <button onClick={() => handleExcluirClick(p.id)} className="text-red-600 font-bold text-xs">Excluir</button>
                 </td>
               </tr>
             ))}
-            {produtos.length === 0 && (
-              <tr>
-                <td colSpan="6" className="p-8 text-center text-gray-400 font-medium text-sm">Nenhum produto importado até o momento.</td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
-
     </div>
   );
 }
