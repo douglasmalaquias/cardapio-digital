@@ -40,12 +40,12 @@ export default function CustomerView() {
     carregarCardapio();
   }, [slug]);
 
-  // Timer do Carrossel (Troca a cada 5 segundos para dar tempo de ver a foto inteira)
+  // Timer do Carrossel (Troca a cada 4 segundos)
   useEffect(() => {
     if (anuncios.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentBanner((prev) => (prev + 1) % anuncios.length);
-    }, 5000); // 5 segundos
+    }, 4000);
     return () => clearInterval(interval);
   }, [anuncios]);
 
@@ -69,10 +69,11 @@ export default function CustomerView() {
         </div>
       </header>
 
-      {/* CARROSSEL DE ANÚNCIOS: EXIBIÇÃO DA IMAGEM INTEIRA COM FUNDO BLUR */}
+      {/* CARROSSEL DE ANÚNCIOS: PROPORÇÃO AJUSTADA PARA EVITAR CORTE NA FACHADA EM TABLETS */}
       {anuncios.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 pt-4">
-          <div className="relative h-44 sm:h-52 md:h-64 w-full rounded-3xl overflow-hidden shadow-xs border bg-black group">
+          {/* Trocamos 'h-44 sm:h-52 md:h-64' e o aspect-video por uma proporção mais alta e flexível para evitar cortes */}
+          <div className="relative aspect-[4/3] sm:aspect-[16/9] md:h-80 w-full rounded-3xl overflow-hidden shadow-xs border bg-black group">
             
             {/* Wrapper dos Banners */}
             <div className="w-full h-full relative">
@@ -144,7 +145,6 @@ export default function CustomerView() {
           {produtosFiltrados.map(prod => (
             <div key={prod.id} className="bg-white border p-5 rounded-3xl flex flex-col justify-between shadow-xs">
               <div className="flex flex-col space-y-4">
-                {/* Janela da foto do card preenchida proporcionalmente */}
                 <div className="w-full h-48 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
                   {prod.image_url ? (
                     <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
@@ -168,7 +168,7 @@ export default function CustomerView() {
         </div>
       </main>
 
-      {/* MODAL DETALHES COMPLETO COM IMAGEM INTEIRA E FUNDO BLUR */}
+      {/* MODAL DETALHES */}
       {produtoModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col animate-zoom-in">
@@ -179,13 +179,10 @@ export default function CustomerView() {
               ✕
             </button>
             
-            {/* Janela do modal com Fundo Blur e Imagem Inteira */}
             <div className="w-full h-64 bg-black flex items-center justify-center border-b shrink-0 relative overflow-hidden">
               {produtoModal.image_url ? (
                 <>
-                  {/* Fundo Blur */}
                   <img src={produtoModal.image_url} alt="" className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-50 scale-110 z-0" />
-                  {/* Imagem Inteira (contain) */}
                   <img src={produtoModal.image_url} alt={produtoModal.nome} className="relative z-10 w-full h-full object-contain object-center" />
                 </>
               ) : (
