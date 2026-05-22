@@ -58,6 +58,7 @@ export default function AdminProdutos() {
     const headers = "Nome,Preco,Categoria,Descricao,Link_Imagem\n";
     const exemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
     
+    // Adiciona o BOM para sinalizar UTF-8
     const blob = new Blob(["\ufeff" + headers + exemplo1], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -68,7 +69,7 @@ export default function AdminProdutos() {
     document.body.removeChild(link);
   }
 
-  // FUNÇÃO ATUALIZADA: Motor robusto para ler o CSV gerado pelo Excel
+  // FUNÇÃO ATUALIZADA: Leitura inteligente com contingência de Encoding (ANSI/Windows-1252)
   async function handleImportarCSV(e) {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
@@ -78,15 +79,12 @@ export default function AdminProdutos() {
       return;
     }
 
-    try {
-      setUploading(true);
-      const leitor = new FileReader();
-      
-      leitor.onload = async (evento) => {
-        const texto = evento.target.result;
+    setUploading(true);
+
+    const processarPlanilha = async (texto, fileInputEvent) => {
+      try {
         const linhas = texto.split(/\r?\n/); 
         
-        // PARSER INTELIGENTE: Lê vírgulas ou ponto-e-vírgula e respeita aspas
         const parseLinhaCSV = (linhaStr) => {
           let resultado = [];
           let valorAtual = '';
@@ -146,15 +144,34 @@ export default function AdminProdutos() {
         
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
-      };
+      } catch (err) {
+        alert("Erro na importação: " + err.message);
+      } finally {
+        setUploading(false);
+        fileInputEvent.target.value = '';
+      }
+    };
 
-      leitor.readAsText(arquivo, 'UTF-8');
-    } catch (err) {
-      alert("Erro na importação: " + err.message);
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
+    const leitorUTF8 = new FileReader();
+    
+    leitorUTF8.onload = (evento) => {
+      const texto = evento.target.result;
+      
+      // Checagem do caractere substituto (). Se existir, a codificação do Excel corrompeu o UTF-8.
+      if (texto.includes('')) {
+        console.log("Encoding corrompido detectado. Acionando fallback para Windows-1252...");
+        const leitorANSI = new FileReader();
+        leitorANSI.onload = (eventoANSI) => {
+          processarPlanilha(eventoANSI.target.result, e);
+        };
+        leitorANSI.readAsText(arquivo, 'windows-1252');
+      } else {
+        processarPlanilha(texto, e);
+      }
+    };
+
+    // Tenta ler o padrão global primeiro
+    leitorUTF8.readAsText(arquivo, 'UTF-8');
   }
 
   function resetarFormulario() {
