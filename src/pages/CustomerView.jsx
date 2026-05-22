@@ -46,7 +46,7 @@ export default function CustomerView() {
 
     const interval = setInterval(() => {
       setCurrentBanner((prev) => (prev + 1) % anuncios.length);
-    }, 4000); // 4000ms = 4 segundos
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [anuncios]);
@@ -71,10 +71,11 @@ export default function CustomerView() {
         </div>
       </header>
 
-      {/* NOVO CARROSSEL AUTOMÁTICO DE ANÚNCIOS */}
+      {/* CARROSSEL AUTOMÁTICO RE-CALIBRADO PARA TABLETS */}
       {anuncios.length > 0 && (
-        <div className="max-w-5xl mx-auto px-4 pt-6">
-          <div className="relative aspect-video md:h-64 rounded-3xl overflow-hidden shadow-xs border bg-gray-100 group">
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          {/* Trocamos 'aspect-video' por alturas fixas controladas para não achatar nem empurrar o layout */}
+          <div className="relative h-44 sm:h-52 md:h-56 w-full rounded-3xl overflow-hidden shadow-xs border bg-gray-100">
             
             {/* Wrapper dos Banners */}
             <div className="w-full h-full relative">
@@ -85,12 +86,12 @@ export default function CustomerView() {
                     index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
                 >
-                  {/* Imagem do Banner */}
+                  {/* Imagem preenchendo a faixa sem distorcer */}
                   <img src={ad.image} alt={ad.title} className="w-full h-full object-cover object-center" />
                   
-                  {/* Gradiente Escuro e Título Totalmente Centralizado */}
+                  {/* Gradiente Escuro e Título Centralizado */}
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-6 text-center">
-                    <h2 className="text-white font-black text-xl md:text-3xl uppercase tracking-wide drop-shadow-md max-w-lg leading-tight animate-fade-in">
+                    <h2 className="text-white font-black text-lg md:text-2xl uppercase tracking-wide drop-shadow-md max-w-xl leading-tight">
                       {ad.title}
                     </h2>
                   </div>
@@ -98,9 +99,9 @@ export default function CustomerView() {
               ))}
             </div>
 
-            {/* Indicadores de Bolinha (Dots Navigation) - Só aparecem se houver mais de 1 anúncio */}
+            {/* Indicadores (Dots) */}
             {anuncios.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20 bg-black/20 backdrop-blur-xs px-3 py-1.5 rounded-full">
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20 bg-black/20 backdrop-blur-xs px-3 py-1.5 rounded-full">
                 {anuncios.map((_, idx) => (
                   <button
                     key={idx}
@@ -118,7 +119,7 @@ export default function CustomerView() {
       )}
 
       {/* CATEGORIAS */}
-      <nav className="max-w-5xl mx-auto px-4 pt-6 sticky top-[73px] z-30 bg-gray-50/90 backdrop-blur-md py-2">
+      <nav className="max-w-5xl mx-auto px-4 pt-4 sticky top-[73px] z-30 bg-gray-50/90 backdrop-blur-md py-2">
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
           <button 
             onClick={() => setCategoriaAtiva('Todos')} 
@@ -139,12 +140,12 @@ export default function CustomerView() {
       </nav>
 
       {/* LISTA DE PRODUTOS */}
-      <main className="max-w-5xl mx-auto px-4 pt-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <main className="max-w-5xl mx-auto px-4 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {produtosFiltrados.map(prod => (
             <div key={prod.id} className="bg-white border p-5 rounded-3xl flex flex-col justify-between shadow-xs">
               <div className="flex flex-col space-y-4">
-                <div className="w-full h-48 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
+                <div className="w-full h-44 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center border shrink-0">
                   {prod.image_url ? (
                     <img src={prod.image_url} alt={prod.nome} className="w-full h-full object-cover object-center" />
                   ) : (
