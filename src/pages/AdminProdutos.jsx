@@ -15,12 +15,16 @@ export default function AdminProdutos() {
 
   const [editandoId, setEditandoId] = useState(null);
 
+  // Campos do formulário
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imagemArquivo, setImagemArquivo] = useState(null);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
+
+  // ESTADO DE SELEÇÃO EM MASSA
+  const [selecionados, setSelecionados] = useState([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -58,7 +62,6 @@ export default function AdminProdutos() {
     const headers = "Nome,Preco,Categoria,Descricao,Link_Imagem\n";
     const exemplo1 = "Burger Clássico,\"34,90\",Burgers,\"Blend artesanal 150g, queijo prato\",\n";
     
-    // Adiciona o BOM para sinalizar UTF-8
     const blob = new Blob(["\ufeff" + headers + exemplo1], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -69,7 +72,6 @@ export default function AdminProdutos() {
     document.body.removeChild(link);
   }
 
-  // FUNÇÃO ATUALIZADA: Leitura inteligente com contingência de Encoding (ANSI/Windows-1252)
   async function handleImportarCSV(e) {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
@@ -91,7 +93,7 @@ export default function AdminProdutos() {
           let dentroDeAspas = false;
           
           for (let i = 0; i < linhaStr.length; i++) {
-            let char = linhaStr[i];
+            let char = inlineStr = linhaStr[i];
             if (char === '"') {
               dentroDeAspas = !dentroDeAspas;
             } else if ((char === ',' || char === ';') && !dentroDeAspas) {
@@ -105,7 +107,7 @@ export default function AdminProdutos() {
           return resultado;
         };
 
-        const linhasDeDados = linhas.slice(1);
+        const linhasDeDados = lines = linhas.slice(1);
         const produtosParaInserir = [];
 
         for (let linha of linhasDeDados) {
@@ -141,7 +143,7 @@ export default function AdminProdutos() {
         if (error) throw error;
 
         alert(`${produtosParaInserir.length} produtos cadastrados em massa com sucesso!`);
-        
+        setSelecionados([]); // Reseta seleção
         const { data: prods } = await supabase.from('produtos').select('*').eq('estabelecimento_id', estabelecimento.id).order('nome');
         setProdutos(prods || []);
       } catch (err) {
@@ -153,13 +155,9 @@ export default function AdminProdutos() {
     };
 
     const leitorUTF8 = new FileReader();
-    
     leitorUTF8.onload = (evento) => {
       const texto = evento.target.result;
-      
-      // Checagem do caractere substituto (). Se existir, a codificação do Excel corrompeu o UTF-8.
       if (texto.includes('')) {
-        console.log("Encoding corrompido detectado. Acionando fallback para Windows-1252...");
         const leitorANSI = new FileReader();
         leitorANSI.onload = (eventoANSI) => {
           processarPlanilha(eventoANSI.target.result, e);
@@ -169,9 +167,51 @@ export default function AdminProdutos() {
         processarPlanilha(texto, e);
       }
     };
-
-    // Tenta ler o padrão global primeiro
     leitorUTF8.readAsText(arquivo, 'UTF-8');
+  }
+
+  // LOGICA DO SELECIONAR TODOS
+  function handleSelecionarTodos() {
+    if (selecionados.length === produtos.length) {
+      setSelecionados([]); // Desmarca tudo
+    } else {
+      const todosIds = produtos.map(p => p.id);
+      setSelecionados(todosIds); // Marca tudo
+    }
+  }
+
+  // LOGICA DA SELEÇÃO INDIVIDUAL
+  function handleSelecionarItem(id) {
+    if (selecionados.includes(id)) {
+      setSelecionados(selecionados.filter(item => item !== id));
+    } else {
+      setSelecionados([...selecionados, id]);
+    }
+  }
+
+  // EXCLUSÃO EM MASSA (BULK DELETE) VIA OPERADOR .IN()
+  async function handleExcluirEmMassa() {
+    if (!window.confirm(`Tem certeza absoluta de que deseja excluir os ${selecionados.length} produtos selecionados de uma só vez?`)) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('produtos')
+        .delete()
+        .in('id', selecionados); // Disparo em lote de alta performance
+
+      if (error) throw error;
+
+      alert(`${selecionados.length} produtos removidos com sucesso!`);
+      
+      // Atualiza o estado local filtrando o que foi apagado
+      setProdutos(produtos.filter(p => !selecionados.includes(p.id)));
+      setSelecionados([]); // Limpa as caixas de seleção
+    } catch (err) {
+      alert("Erro ao excluir em lote: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function resetarFormulario() {
@@ -198,6 +238,7 @@ export default function AdminProdutos() {
       const { error } = await supabase.from('produtos').delete().eq('id', id);
       if (error) throw error;
       setProdutos(produtos.filter(p => p.id !== id));
+      setSelecionados(selecionados.filter(item => item !== id));
       alert('Produto excluído!');
     } catch (err) {
       alert('Erro ao excluir: ' + err.message);
@@ -237,7 +278,7 @@ export default function AdminProdutos() {
       if (editandoId) {
         const { error: updateError } = await supabase.from('produtos').update(dadosProduto).eq('id', editandoId);
         if (updateError) throw updateError;
-        alert('Produto atualizado!');
+        alert('Produto updated!');
       } else {
         const { error: insertError } = await supabase.from('produtos').insert([dadosProduto]);
         if (insertError) throw insertError;
@@ -266,8 +307,19 @@ export default function AdminProdutos() {
           </button>
           <h1 className="text-2xl font-black">Gestão Administrativa - {estabelecimento.nome}</h1>
         </div>
+        
+        {/* BOTÃO FLUTUANTE DE EXCLUSÃO EM MASSA DINÂMICO */}
+        {selecionados.length > 0 && (
+          <button 
+            onClick={handleExcluirEmMassa}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-md animate-fade-in cursor-pointer"
+          >
+            🗑️ Excluir Selecionados ({selecionados.length})
+          </button>
+        )}
       </div>
 
+      {/* DASHBOARD DE IMPORTAÇÃO */}
       <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
         <div>
           <h2 className="font-bold text-gray-900 text-base">Onboarding: Importação Rápida via Planilha</h2>
@@ -293,6 +345,7 @@ export default function AdminProdutos() {
         </div>
       </div>
 
+      {/* FORMULÁRIO */}
       <form onSubmit={handleSalvarProduto} className="space-y-4 bg-white p-6 rounded-3xl shadow-sm border mb-8">
         <h2 className="text-sm font-bold text-gray-700 uppercase mb-2">
           {editandoId ? '✏️ Ajustar / Editar Detalhes do Produto' : '➕ Cadastrar Produto Avulso'}
@@ -331,10 +384,19 @@ export default function AdminProdutos() {
         </div>
       </form>
 
+      {/* TABELA DE VISUALIZAÇÃO COM CHECKBOXES DE MASSA */}
       <div className="bg-white rounded-3xl border overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b">
             <tr>
+              <th className="p-4 w-12 text-center">
+                <input 
+                  type="checkbox" 
+                  checked={produtos.length > 0 && selecionados.length === produtos.length} 
+                  onChange={handleSelecionarTodos}
+                  className="w-4 h-4 cursor-pointer accent-amber-500 rounded" 
+                />
+              </th>
               <th className="p-4 text-xs font-bold text-gray-500 uppercase w-24">Foto</th>
               <th className="p-4 text-xs font-bold text-gray-500 uppercase">Produto</th>
               <th className="p-4 text-xs font-bold text-gray-500 uppercase">Categoria</th>
@@ -344,7 +406,15 @@ export default function AdminProdutos() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {produtos.map(prod => (
-              <tr key={prod.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={prod.id} className={`hover:bg-gray-50 transition-colors ${selecionados.includes(prod.id) ? 'bg-amber-50/40' : ''}`}>
+                <td className="p-4 text-center">
+                  <input 
+                    type="checkbox" 
+                    checked={selecionados.includes(prod.id)} 
+                    onChange={() => handleSelecionarItem(prod.id)}
+                    className="w-4 h-4 cursor-pointer accent-amber-500 rounded" 
+                  />
+                </td>
                 <td className="p-4">
                   <div className="w-12 h-12 rounded-xl overflow-hidden border shrink-0 bg-gray-50">
                     {prod.image_url ? (
@@ -366,6 +436,11 @@ export default function AdminProdutos() {
                 </td>
               </tr>
             ))}
+            {produtos.length === 0 && (
+              <tr>
+                <td colSpan="6" className="p-8 text-center text-gray-400 font-medium text-sm">Nenhum produto importado até o momento.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
